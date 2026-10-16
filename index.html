@@ -1,0 +1,1865 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#f4f8f1" />
+    <meta name="color-scheme" content="light" />
+    <script src="config.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <title>情緒導航員</title>
+    <style>
+:root {
+  font-family: 'Noto Sans TC', 'Microsoft JhengHei', 'Trebuchet MS', sans-serif;
+  color: #173a35;
+  background: #f4f8f1;
+  color-scheme: light;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  box-sizing: border-box;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  --ink: #173a35;
+  --muted: #59736c;
+  --green: #176e5c;
+  --green-dark: #105648;
+  --mint: #dcefe3;
+  --coral: #db6e55;
+  --yellow: #efc65c;
+  --line: #d7e4d9;
+  --paper: #fffefa;
+  --shadow: 0 16px 48px rgb(31 76 60 / 9%);
+}
+
+* { box-sizing: border-box; }
+
+body {
+  min-width: 320px;
+  min-height: 100vh;
+  margin: 0;
+  background:
+    radial-gradient(ellipse at 12% 10%, rgb(220 239 227 / 76%), transparent 33rem),
+    linear-gradient(135deg, #f4f8f1 0%, #f8f6e9 54%, #edf5ef 100%);
+}
+
+button, input, select { font: inherit; }
+button { color: inherit; }
+button:focus-visible, a:focus-visible, input:focus-visible + label {
+  outline: 3px solid #df9b38;
+  outline-offset: 3px;
+}
+
+.topbar {
+  position: sticky;
+  z-index: 20;
+  top: env(safe-area-inset-top, 0px);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 72px;
+  padding: 0 clamp(20px, 6vw, 88px);
+  border-bottom: 1px solid rgb(23 58 53 / 9%);
+  background: rgb(248 250 244 / 96%);
+  backdrop-filter: blur(10px);
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--ink);
+  font-family: Georgia, 'Noto Sans TC', serif;
+  font-size: 17px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.brand-mark {
+  display: grid;
+  width: 30px;
+  aspect-ratio: 1;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--green);
+  color: white;
+  font-size: 16px;
+}
+
+.help-button, .button, .choice-card, .emotion-choice, .strength-choice {
+  cursor: pointer;
+}
+
+.help-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 42px;
+  padding: 0 15px;
+  border: 1px solid #c4d9cc;
+  border-radius: 6px;
+  background: rgb(255 254 250 / 75%);
+  color: var(--green-dark);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.help-button span { color: var(--coral); font-size: 18px; }
+.help-button:hover { background: white; border-color: var(--green); }
+.top-actions { display: flex; align-items: center; justify-content: flex-end; gap: 9px; }
+.header-button { min-height: 40px; padding: 0 12px; border: 1px solid var(--line); border-radius: 5px; background: #fffefa; color: var(--green-dark); cursor: pointer; font-size: 12px; font-weight: 800; }
+.header-button:hover { border-color: var(--green); }
+.session-timer { display: flex; min-width: 120px; align-items: center; justify-content: center; gap: 9px; padding: 7px 12px; border: 2px solid #cf9b37; border-radius: 6px; background: #fff5d7; color: #583f0f; }
+.session-timer strong { font-size: 20px; font-variant-numeric: tabular-nums; }
+.timer-label { font-size: 11px; font-weight: 800; }
+.session-timer.urgent { border-color: #bd4d3f; background: #fff0e9; color: #8c332b; animation: timer-pulse 1.4s ease-in-out infinite; }
+@keyframes timer-pulse { 50% { box-shadow: 0 0 0 4px rgb(189 77 63 / 13%); } }
+[hidden] { display: none !important; }
+
+.app-shell {
+  width: min(1100px, calc(100% - 40px));
+  margin: 0 auto;
+  padding: clamp(34px, 6vw, 72px) 0 30px;
+}
+
+.intro { max-width: 700px; margin: 0 auto 38px; text-align: center; }
+.eyebrow {
+  margin: 0 0 10px;
+  color: var(--green);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 1.2px;
+}
+
+h1, h2, h3, p { overflow-wrap: anywhere; }
+h1 {
+  margin: 0;
+  color: var(--ink);
+  font-family: Georgia, 'Noto Sans TC', serif;
+  font-size: clamp(30px, 5vw, 48px);
+  font-weight: 700;
+  line-height: 1.24;
+}
+
+.intro-copy { margin: 15px 0 0; color: var(--muted); font-size: 15px; line-height: 1.8; }
+
+.work-area {
+  max-width: 820px;
+  margin: 0 auto;
+  padding: clamp(22px, 4vw, 38px);
+  border: 1px solid rgb(23 58 53 / 10%);
+  border-radius: 10px;
+  background: var(--paper);
+  box-shadow: var(--shadow);
+}
+
+.journey-head { display: flex; align-items: end; justify-content: space-between; gap: 16px; }
+.journey-head .eyebrow { margin-bottom: 7px; }
+.journey-head h2 { margin: 0; font-size: clamp(20px, 3vw, 26px); line-height: 1.4; }
+.step-count { flex: 0 0 auto; color: #789087; font-size: 12px; font-weight: 700; }
+
+.progress-track { height: 5px; margin: 22px 0 26px; overflow: hidden; border-radius: 5px; background: #e8eee7; }
+.progress-track span { display: block; width: 25%; height: 100%; border-radius: inherit; background: var(--green); transition: width 220ms ease; }
+.screen { min-height: 290px; animation: arrive 260ms ease both; }
+
+@keyframes arrive {
+  from { opacity: 0; transform: translateY(7px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.choice-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.choice-card {
+  display: grid;
+  grid-template-columns: 58px 1fr;
+  align-items: center;
+  gap: 14px;
+  min-height: 112px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: #fff;
+  text-align: left;
+  transition: transform 150ms ease, border-color 150ms ease, background 150ms ease;
+}
+.choice-card:hover { transform: translateY(-2px); border-color: #79ac92; background: #fbfefa; }
+.choice-emoji { display: grid; width: 54px; aspect-ratio: 1; place-items: center; border-radius: 5px; background: #f0f5e9; font-size: 30px; }
+.choice-card[data-state="angry"] .choice-emoji { background: #fff0e9; }
+.choice-card[data-state="happy"] .choice-emoji { background: #fff6d9; }
+.choice-card[data-state="sad"] .choice-emoji { background: #eaf3f5; }
+.choice-card[data-state="calm"] .choice-emoji { background: #e5f2e7; }
+.choice-card strong, .emotion-choice strong { display: block; margin-bottom: 4px; font-size: 16px; }
+.choice-card small, .emotion-choice small { display: block; color: var(--muted); font-size: 13px; line-height: 1.55; }
+
+.emotion-list, .strength-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.emotion-choice, .strength-choice {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 78px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: white;
+  text-align: left;
+}
+.emotion-choice:hover, .strength-choice:hover { border-color: #79ac92; background: #fbfefa; }
+.emotion-choice[aria-pressed="true"], .strength-choice[aria-pressed="true"] { border: 2px solid var(--green); background: #eef7ef; }
+.emotion-icon, .strength-icon { display: grid; flex: 0 0 38px; width: 38px; aspect-ratio: 1; place-items: center; border-radius: 50%; background: #eff5ec; font-size: 21px; }
+.emotion-choice > span:last-child, .strength-choice > span:last-child { min-width: 0; }
+.strength-choice.selected { border: 2px solid var(--green); background: #eef7ef; }
+.selection-note { margin: 13px 0 0; color: var(--muted); font-size: 13px; }
+
+.range-panel { padding: 22px; border-radius: 7px; background: #f4f7ef; }
+.range-top { display: flex; justify-content: space-between; gap: 12px; align-items: center; }
+.range-top strong { font-size: 17px; }
+.range-value { display: grid; min-width: 42px; aspect-ratio: 1; place-items: center; border-radius: 50%; background: var(--green); color: white; font-weight: 800; }
+.range-panel input[type="range"] { width: 100%; margin: 25px 0 8px; accent-color: var(--green); cursor: pointer; }
+.range-labels { display: flex; justify-content: space-between; color: var(--muted); font-size: 12px; }
+.range-hint { margin: 16px 0 0; color: var(--ink); font-size: 14px; line-height: 1.7; }
+
+.profile-form { display: grid; max-width: 510px; gap: 14px; margin: 0 auto; }
+.profile-form > label { display: grid; gap: 7px; color: var(--ink); font-size: 14px; font-weight: 800; }
+.profile-form input, .profile-form select { width: 100%; min-height: 48px; padding: 10px 12px; border: 1px solid #b9cec0; border-radius: 5px; background: white; color: var(--ink); font-size: 17px; }
+.profile-privacy { margin: 1px 0 0; padding: 12px 14px; border-left: 3px solid #d5a947; background: #fbf6e7; color: #5c5136; font-size: 12px; line-height: 1.7; }
+.profile-error { min-height: 18px; margin: 0; color: #a53f34; font-size: 13px; }
+.profile-data-control { padding-top: 5px; border-top: 1px solid #e5ebe4; text-align: right; }
+.profile-data-control .button { min-height: 38px; font-size: 12px; }
+.start-panel { min-height: 260px; display: grid; align-content: center; }
+
+.feedback-note { margin: 0 0 16px; color: var(--muted); font-size: 14px; line-height: 1.75; }
+.activity-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 13px; }
+.activity-card { min-width: 0; overflow: hidden; border: 1px solid var(--line); border-radius: 7px; background: white; }
+.activity-card > img { display: block; width: 100%; height: auto; aspect-ratio: 13 / 8; object-fit: cover; background: #edf3e9; }
+.activity-card-copy { padding: 15px; }
+.activity-card-meta { display: flex; justify-content: space-between; gap: 8px; color: var(--green); font-size: 11px; font-weight: 800; }
+.activity-card h3, .guide-copy h3, .activity-check h3 { margin: 8px 0 5px; font-size: 17px; }
+.activity-card p, .guide-copy > p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.65; }
+.activity-pick { width: 100%; min-height: 40px; margin-top: 13px; font-size: 13px; }
+.activity-card.locked { border-color: #e3c9c3; background: #fbf7f5; }
+.activity-card.locked > img { filter: saturate(.55); }
+.activity-card.locked .activity-card-meta { color: #a04f43; }
+.locked-note { display: block; margin-top: 12px; color: #91483e; font-size: 12px; font-weight: 700; line-height: 1.5; }
+.safety-banner { margin-bottom: 16px; padding: 15px 17px; border-left: 4px solid #c75e4e; border-radius: 4px; background: #fff0e9; color: #713e34; font-size: 14px; line-height: 1.75; }
+.guide-layout { display: grid; grid-template-columns: minmax(190px, .9fr) minmax(0, 1.1fr); gap: 20px; align-items: start; }
+.guide-image { display: block; width: 100%; height: auto; border: 1px solid var(--line); border-radius: 7px; }
+.guide-copy { min-width: 0; }
+.guide-copy h3 { margin-top: 9px; font-size: 21px; }
+.guide-steps { display: grid; gap: 10px; margin: 16px 0; padding: 0; list-style: none; counter-reset: step; }
+.guide-steps li { counter-increment: step; }
+.guide-steps label { display: flex; align-items: flex-start; gap: 10px; padding: 12px; border: 1px solid var(--line); border-radius: 5px; background: #fbfcf8; font-size: 14px; line-height: 1.65; }
+.guide-steps label::before { display: grid; flex: 0 0 25px; width: 25px; aspect-ratio: 1; place-items: center; border-radius: 50%; background: var(--mint); color: var(--green-dark); content: counter(step); font-size: 12px; font-weight: 800; }
+.guide-steps input { flex: 0 0 18px; width: 18px; height: 18px; margin: 4px 0 0; accent-color: var(--green); }
+.drawing-panel, .wheel-panel { display: grid; gap: 9px; margin-top: 15px; }
+#doodle-canvas { display: block; width: 100%; height: 150px; border: 1px solid #cbdccf; border-radius: 5px; background: #fffefa; touch-action: none; }
+.wheel-panel { grid-template-columns: 92px minmax(0, 1fr); align-items: center; }
+.wheel-control { display: grid; min-height: 90px; place-items: center; gap: 2px; border: 1px solid var(--line); border-radius: 6px; background: #f2f6ec; color: var(--green-dark); cursor: pointer; font-size: 12px; font-weight: 800; }
+.wheel-art { display: grid; width: 52px; aspect-ratio: 1; place-items: center; border: 5px solid var(--green); border-radius: 50%; font-size: 34px; transition: transform 300ms ease; }
+.wheel-control.turned .wheel-art { transform: rotate(180deg); }
+.reframe-list { display: grid; gap: 6px; }
+.reframe-choice { padding: 9px 10px; border: 1px solid var(--line); border-radius: 5px; background: white; color: var(--ink); cursor: pointer; font-size: 12px; line-height: 1.5; text-align: left; }
+.reframe-choice.selected { border: 2px solid var(--green); background: #eef7ef; }
+.reframe-choice:disabled { cursor: not-allowed; opacity: .5; }
+.verification-note { margin: 12px 0 0; color: #6b6251; font-size: 12px; line-height: 1.6; }
+.guide-instruction { margin: 12px 0; padding: 11px 13px; border-left: 3px solid #d6ad48; border-radius: 3px; background: #fbf6e7; color: #5b4b26; }
+.check-label { display: block; margin-top: 5px; color: var(--green); font-size: 11px; font-weight: 800; }
+.adult-confirm { display: flex; align-items: flex-start; gap: 12px; margin: 15px 0; padding: 15px; border: 1px solid #c9dace; border-radius: 6px; background: #f1f7ee; color: var(--ink); cursor: pointer; font-size: 15px; font-weight: 800; line-height: 1.6; }
+.adult-confirm input { flex: 0 0 23px; width: 23px; height: 23px; margin: 1px 0 0; accent-color: var(--green); }
+.activity-timer-panel { display: grid; grid-template-columns: minmax(0,1fr) auto auto; align-items: center; gap: 10px; margin: 14px 0; padding: 14px; border: 1px solid #bfd7ca; border-radius: 7px; background: #edf7ef; }
+.activity-timer-copy { display: grid; gap: 4px; }
+.activity-timer-copy strong { color: var(--green-dark); font-size: 16px; }
+.activity-timer-copy span, .activity-timer-panel > p { color: var(--muted); font-size: 12px; }
+.activity-timer-value { min-width: 52px; color: var(--ink); font-size: 22px; font-weight: 800; font-variant-numeric: tabular-nums; text-align: center; }
+.activity-timer-panel > p { grid-column: 1 / -1; margin: 0; line-height: 1.6; }
+.timer-big-number { display: grid; min-width: 46px; aspect-ratio: 1; place-items: center; border-radius: 50%; background: var(--green); color: white; font-size: 27px; font-weight: 900; }
+.timer-finished { color: var(--green-dark); font-weight: 900; }
+.interaction-instruction { margin: 13px 0 9px; color: var(--green-dark); font-size: 13px; font-weight: 700; line-height: 1.6; }
+.roulette-panel { display: grid; justify-items: center; gap: 9px; margin: 14px 0; padding: 15px; border: 1px solid var(--line); border-radius: 7px; background: #f7f7ed; }
+.roulette-pointer { z-index: 1; margin-bottom: -17px; color: #b94f41; font-size: 27px; }
+.roulette-wheel { position: relative; width: min(220px, 58vw); aspect-ratio: 1; border: 5px solid #fffefa; border-radius: 50%; background: conic-gradient(#f5d877 -60deg 60deg, #b9dbc3 60deg 180deg, #edaa8a 180deg 300deg, #f5d877 300deg 360deg); box-shadow: 0 3px 13px rgb(23 58 53 / 18%); cursor: pointer; transition: transform 1.5s cubic-bezier(.11,.72,.17,1); }
+.roulette-wheel.spinning { filter: saturate(1.2); }
+.roulette-label { position: absolute; width: 90px; color: #173a35; font-size: 11px; font-weight: 900; line-height: 1.35; text-align: center; }
+.label-a { top: 23px; left: calc(50% - 45px); }
+.label-b { right: 7px; bottom: 35px; transform: rotate(120deg); }
+.label-c { bottom: 35px; left: 7px; transform: rotate(-120deg); }
+.roulette-result { min-height: 20px; margin: 0; color: var(--green-dark); font-size: 13px; font-weight: 900; }
+.sticker-groups { display: grid; gap: 16px; }
+.sticker-group h3 { margin: 0 0 8px; font-size: 16px; }
+.sticker-shelf { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 8px; }
+.sticker-tile { display: grid; min-height: 116px; align-content: center; justify-items: center; gap: 5px; padding: 9px; border: 1px solid var(--line); border-radius: 6px; text-align: center; }
+.sticker-tile.earned { background: #f5f6e6; border-color: #d9c675; }
+.sticker-tile.unearned { background: #f3f5f1; color: #839189; }
+.sticker-tile > span { font-size: 26px; }
+.sticker-tile strong { font-size: 11px; line-height: 1.4; }
+.sticker-tile small { font-size: 10px; line-height: 1.4; }
+.activity-check { max-width: 560px; margin: 0 auto; padding: 10px 0; text-align: center; }
+.activity-check img { width: 130px; height: 80px; border-radius: 6px; object-fit: cover; }
+.activity-check h3 { font-size: 23px; }
+.activity-check > p:not(.verification-note) { color: var(--muted); line-height: 1.75; }
+.check-buttons { justify-content: center; }
+.report-summary { font-size: 13px; }
+.report-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.report-table th, .report-table td { padding: 8px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+
+.button-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 22px; }
+.button-row.end { justify-content: flex-end; }
+.button {
+  min-height: 46px;
+  padding: 0 18px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 800;
+}
+.button-primary { background: var(--green); color: white; }
+.button-primary:hover { background: var(--green-dark); }
+.button-secondary { border-color: var(--line); background: white; color: var(--ink); }
+.button-secondary:hover { border-color: #79ac92; }
+.button-link { border: 0; background: transparent; color: var(--muted); text-decoration: underline; text-underline-offset: 3px; }
+.button:disabled { cursor: not-allowed; opacity: .45; }
+
+.done-panel { padding: 22px 10px; text-align: center; }
+.done-mark { display: grid; width: 64px; aspect-ratio: 1; margin: 0 auto 14px; place-items: center; border-radius: 50%; background: #e6f2e6; color: var(--green); font-size: 30px; }
+.done-panel h3 { margin: 0; font-family: Georgia, 'Noto Sans TC', serif; font-size: 25px; }
+.done-panel p { max-width: 460px; margin: 10px auto 0; color: var(--muted); line-height: 1.8; }
+.strength-summary { display: flex; justify-content: center; flex-wrap: wrap; gap: 8px; margin-top: 17px; }
+.strength-summary span { padding: 7px 10px; border-radius: 4px; background: #f3f6e9; color: #375b4d; font-size: 13px; }
+
+.page-note { display: flex; align-items: center; justify-content: center; gap: 9px; margin: 24px auto 0; color: #627a70; font-size: 13px; line-height: 1.7; text-align: center; }
+.note-star { color: var(--coral); font-size: 17px; }
+
+.help-dialog { width: min(430px, calc(100% - 32px)); padding: 0; border: 1px solid var(--line); border-radius: 9px; background: var(--paper); color: var(--ink); box-shadow: 0 22px 80px rgb(16 40 31 / 24%); }
+.help-dialog::backdrop { background: rgb(20 42 35 / 42%); }
+.help-dialog form { position: relative; padding: 32px; }
+.help-dialog h2 { margin: 0; font-family: Georgia, 'Noto Sans TC', serif; font-size: 27px; }
+.help-dialog p:not(.eyebrow) { color: var(--muted); line-height: 1.8; }
+.dialog-close { position: absolute; top: 13px; right: 16px; border: 0; background: none; color: var(--muted); cursor: pointer; font-size: 27px; }
+.dialog-done { margin-top: 8px; }
+.call-progress, .call-success { display: grid; justify-items: center; gap: 11px; padding: 18px 0; text-align: center; }
+.call-progress small { color: var(--muted); }
+.call-spinner { width: 42px; aspect-ratio: 1; border: 4px solid #dce9dd; border-top-color: var(--green); border-radius: 50%; animation: spin 850ms linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.call-success > span { display: grid; width: 50px; aspect-ratio: 1; place-items: center; border-radius: 50%; background: #e3f1e4; color: var(--green); font-size: 27px; font-weight: 900; }
+.call-success strong { font-size: 18px; }
+.call-success p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.7; }
+
+@media (max-width: 620px) {
+  .topbar { display: grid; grid-template-columns: 1fr; gap: 7px; min-height: 0; padding: 9px 12px; }
+  .brand { font-size: 15px; }
+  .help-button { min-height: 40px; padding: 0 9px; font-size: 11px; white-space: nowrap; }
+  .top-actions { width: 100%; justify-content: space-between; gap: 5px; }
+  .header-button { min-height: 40px; padding: 0 8px; font-size: 10px; white-space: nowrap; }
+  .session-timer { min-width: 92px; gap: 5px; padding: 6px 8px; }
+  .session-timer strong { font-size: 17px; }
+  .timer-label { font-size: 9px; }
+  #profile-button { max-width: 58px; padding: 0 8px; }
+  .app-shell { width: min(100% - 24px, 520px); padding-top: 35px; }
+  .intro { margin-bottom: 26px; }
+  .intro-copy { font-size: 14px; }
+  .work-area { padding: 20px 16px; }
+  .screen { min-height: 330px; }
+  .choice-grid, .emotion-list, .strength-list { grid-template-columns: 1fr; }
+  .activity-grid { grid-template-columns: 1fr; }
+  .choice-card { min-height: 88px; }
+  .journey-head { align-items: center; }
+  .step-count { font-size: 11px; }
+  .button-row { align-items: stretch; }
+  .button-row .button { padding: 0 12px; }
+  .page-note { align-items: flex-start; text-align: left; }
+  .guide-layout { grid-template-columns: 1fr; }
+  .guide-image { max-height: 220px; object-fit: cover; }
+  .activity-card > img { max-height: 220px; object-fit: cover; }
+  .wheel-panel { grid-template-columns: 1fr; }
+  .wheel-control { min-height: 74px; }
+  .sticker-shelf { grid-template-columns: repeat(2, minmax(0,1fr)); }
+  .activity-timer-panel { grid-template-columns: 1fr auto; }
+  .activity-timer-panel > .button { grid-column: 1 / -1; width: 100%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; transition-duration: .01ms !important; }
+}
+.guide-guidance { margin: 0 0 12px; font-size: 15px; line-height: 1.7; }
+.guide-two { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: stretch; margin: 14px 0; }
+.do-area, .demo-area { min-width: 0; padding: 14px; border: 1px solid var(--line); border-radius: 7px; background: #fbfcf8; }
+.demo-area { text-align: center; }
+.demo-area img { width: 100%; max-height: 200px; object-fit: contain; border-radius: 6px; background: #e8f3ea; }
+.area-title { margin: 0 0 8px; color: var(--green); font-size: 12px; font-weight: 800; }
+.roulette-wheel.running { animation: wheel-spin 1.1s linear infinite; transition: none; }
+@keyframes wheel-spin { to { transform: rotate(360deg); } }
+.rank-list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.rank-item { display: grid; grid-template-columns: 36px 1fr auto; align-items: center; gap: 10px; padding: 12px; border: 1px solid var(--line); border-radius: 6px; background: #fff; }
+.rank-no { display: grid; width: 32px; aspect-ratio: 1; place-items: center; border-radius: 50%; background: var(--mint); color: var(--green-dark); font-weight: 900; }
+.rank-item small { color: var(--muted); }
+.badge { display: grid; justify-items: center; gap: 6px; padding: 10px 6px; text-align: center; }
+.badge-medal { display: grid; width: 68px; aspect-ratio: 1; place-items: center; border: 4px solid #d9a93c; border-radius: 50%; background: #fff3c8; box-shadow: 0 3px 0 #c58f25; font-size: 32px; }
+.badge strong { font-size: 12px; line-height: 1.4; }
+.badge small { color: var(--muted); font-size: 10px; }
+.badge-bar { width: 100%; height: 7px; overflow: hidden; border-radius: 5px; background: #e8eee7; }
+.badge-bar span { display: block; height: 100%; background: var(--green); }
+.student-block { margin: 0 0 18px; }
+.student-block h3 { margin: 0 0 6px; font-size: 16px; }
+.help-alert { margin: 0 0 12px; padding: 10px 12px; border-left: 4px solid #c75e4e; background: #fff0e9; font-size: 13px; line-height: 1.7; }
+@media (max-width: 620px) { .guide-two { grid-template-columns: 1fr; } }
+.step-no { display: inline-grid; flex: 0 0 24px; width: 24px; aspect-ratio: 1; place-items: center; border-radius: 50%; background: var(--green); color: #fff; font-size: 13px; font-weight: 800; }
+.do-list { display: grid; gap: 10px; margin: 0 0 10px; padding: 0; list-style: none; }
+.do-list li { display: flex; align-items: flex-start; gap: 10px; font-size: 14px; line-height: 1.7; }
+.done-row { display: flex; flex-wrap: wrap; gap: 12px; }
+.done-check { display: flex; align-items: center; gap: 8px; padding: 10px 14px; border: 1px solid var(--line); border-radius: 6px; background: #fbfcf8; cursor: pointer; font-weight: 700; }
+.done-check input { width: 20px; height: 20px; accent-color: var(--green); }
+.tab-row { display: flex; gap: 8px; margin: 0 0 14px; }
+.tab { min-height: 40px; padding: 0 16px; border: 1px solid var(--line); border-radius: 6px; background: #fff; cursor: pointer; font-weight: 800; }
+.tab.active { border-color: var(--green); background: var(--green); color: #fff; }
+.filter-bar { display: flex; flex-wrap: wrap; gap: 10px; align-items: end; margin: 0 0 14px; }
+.filter-bar label { display: grid; gap: 4px; font-size: 12px; font-weight: 800; }
+.filter-bar select { min-height: 38px; padding: 0 8px; border: 1px solid #b9cec0; border-radius: 5px; background: #fff; }
+.urg { padding: 3px 9px; border-radius: 10px; font-size: 12px; font-weight: 800; }
+.u3 { background: #fde0da; color: #8c332b; } .u2 { background: #fff0c9; color: #6b4a0a; } .u1 { background: #e3f1e4; color: #1f5a3a; }
+.kahoot-list { display: grid; gap: 10px; margin: 0 0 8px; padding: 0; list-style: none; }
+.kahoot-row { display: grid; grid-template-columns: 44px 1fr auto; align-items: center; gap: 12px; padding: 14px; border-radius: 10px; color: #fff; animation: k-in .7s cubic-bezier(.2,1.2,.3,1) both; }
+.k0 { background: #e21b3c; } .k1 { background: #1368ce; } .k2 { background: #c78f00; } .k3 { background: #26890c; }
+@keyframes k-in { from { opacity: 0; transform: translateX(-60px) scale(.96); } to { opacity: 1; transform: none; } }
+.k-rank { display: grid; width: 40px; aspect-ratio: 1; place-items: center; border-radius: 50%; background: rgb(255 255 255 / 25%); font-size: 20px; font-weight: 900; }
+.k-bar { display: block; height: 10px; margin-top: 6px; overflow: hidden; border-radius: 5px; background: rgb(255 255 255 / 25%); }
+.k-bar i { display: block; width: var(--w); height: 100%; background: #fff; transform-origin: left; animation: k-grow .9s ease-out both; }
+@keyframes k-grow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+.k-score { text-align: right; font-size: 14px; }
+.k-score b { font-size: 22px; }
+.k-score small { display: block; font-size: 11px; opacity: .85; }
+.flip-row { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; margin: 14px 0; }
+.flip-card { width: 140px; height: 150px; padding: 0; border: 0; background: none; perspective: 700px; cursor: pointer; }
+.flip-inner { position: relative; display: block; width: 100%; height: 100%; transition: transform .6s; transform-style: preserve-3d; }
+.flip-card.flipped .flip-inner { transform: rotateY(180deg); }
+.flip-face { position: absolute; inset: 0; display: grid; place-content: center; gap: 4px; padding: 10px; border-radius: 10px; backface-visibility: hidden; text-align: center; }
+.flip-front { background: var(--green); color: #fff; font-size: 44px; font-weight: 900; }
+.flip-front small { font-size: 12px; }
+.flip-back { transform: rotateY(180deg); border: 3px solid #d9a93c; background: #fff5d7; }
+.flip-back b { font-size: 38px; }
+.flip-back strong { font-size: 14px; }
+.flip-back small { color: #6b5a2a; font-size: 12px; }
+    </style>
+  </head>
+  <body>
+    <header class="topbar">
+      <a class="brand" href="#top" aria-label="情緒導航員首頁" data-action="restart">
+        <span class="brand-mark" aria-hidden="true">✦</span>
+        <span>情緒導航員</span>
+      </a>
+      <div class="top-actions">
+        <div class="session-timer" id="session-timer" aria-live="polite" hidden>
+          <span class="timer-label">整趟倒數</span><strong id="session-clock">05:00</strong>
+        </div>
+        <button class="header-button" id="toolbox-button" type="button" hidden>調適工具箱</button>
+        <button class="header-button" id="stickers-button" type="button" data-action="stickers" hidden>我的貼紙</button>
+        <button class="header-button" id="profile-button" type="button" data-action="profile" hidden>設定個人資料</button>
+        <button class="header-button" id="teacher-logout" type="button" hidden>登出</button>
+        <button class="help-button" type="button" data-action="help"><span aria-hidden="true">♡</span> 找大人幫忙</button>
+      </div>
+    </header>
+
+    <main id="top" class="app-shell">
+      <section class="intro" aria-labelledby="page-title">
+        <p class="eyebrow">給現在的自己一點空間</p>
+        <h1 id="page-title">感覺有好多種，<br />我們慢慢找方向。</h1>
+        <p class="intro-copy">選一艘最像現在的火箭。不用選得很完美，照你的感覺就好。</p>
+      </section>
+
+      <section class="work-area" aria-label="情緒導航步驟">
+        <div class="journey-head">
+          <div>
+            <p class="eyebrow" id="step-label">第 1 步 · 找到現在的狀態</p>
+            <h2 id="step-title">你的火箭現在怎麼了？</h2>
+          </div>
+          <span class="step-count" id="step-count">01 / 04</span>
+        </div>
+        <div class="progress-track" aria-hidden="true"><span id="progress-fill"></span></div>
+        <div id="app" class="screen" aria-live="polite"></div>
+      </section>
+
+      <footer class="page-note">
+        <span class="note-star" aria-hidden="true">✳</span>
+        這裡沒有標準答案。你可以隨時停下來，找身邊信任的大人。
+      </footer>
+    </main>
+
+    <dialog id="help-dialog" class="help-dialog" aria-labelledby="help-title">
+      <form method="dialog">
+        <button class="dialog-close" aria-label="關閉">×</button>
+        <p class="eyebrow" id="help-eyebrow">緊急協助</p>
+        <h2 id="help-title">正在準備求助提醒</h2>
+        <div id="help-content"><p>請稍等，導航員正在準備求助畫面。</p></div>
+        <button class="button button-primary dialog-done" id="help-done" hidden>知道了</button>
+      </form>
+    </dialog>
+
+    <script>
+const states = {
+  angry: {
+    label: '噴火火箭', icon: '🔥', type: '高活力・負向', subtitle: '我很衝、心裡很不舒服！', route: 'negative',
+    emotions: [
+      ['🌋', '暴怒', '我理智線斷掉了，整個人快要炸開！'], ['😡', '生氣', '我很不高興！好想大吼大叫或摔東西！'],
+      ['😱', '驚恐', '突然被嚇到了，心臟狂跳、好恐慌！'], ['😨', '害怕', '好恐怖喔，我縮成一團不敢看！'],
+      ['😰', '緊張', '手心一直冒汗，肚子緊繃很不舒服！'], ['😣', '煩悶', '這件事好煩，讓我很不爽快！'],
+      ['🤢', '討厭', '這個我超不喜歡，真的很不想看到！'], ['😠', '敵意', '我才不想理他，覺得他故意針對我！'],
+      ['😤', '不耐煩', '要等多久？我快要沒耐心受夠了！'],
+    ],
+  },
+  happy: {
+    label: '發光火箭', icon: '🌟', type: '高活力・正向', subtitle: '我精神超好、心裡甜甜的！', route: 'positive', strengthGroup: 'sprint',
+    emotions: [
+      ['🎁', '驚喜', '太不可思議了！竟然有這種好事情！'], ['🤩', '興奮', '好嗨好開心，我全身等不及要衝了！'],
+      ['🎉', '狂喜', '太讚啦！高興到簡直要飛上天！'], ['🔍', '新奇', '這是什麼？好酷喔，我好想試試看！'],
+      ['🥳', '快樂', '遇到好棒的事，嘴角一直停不下來！'], ['😎', '得意', '嘿嘿！這是我做到的，我真厲害！'],
+      ['⚡', '充滿活力', '我體力100%，隨時準備大展身手！'], ['✨', '期待', '迫不及待那一天，好希望快點到來！'],
+      ['🥰', '幸福', '大家對我真好，心裡好甜好滿足！'],
+    ],
+  },
+  sad: {
+    label: '沒電火箭', icon: '🪫', type: '低活力・負向', subtitle: '我全身無力、心裡沉沉的…', route: 'negative',
+    emotions: [
+      ['😔', '自卑', '大家都好厲害，我好像什麼都做不好…'], ['😞', '失望', '本來很期待的，結果卻跟我原想的不一樣…'],
+      ['🥱', '無聊', '沒事做，感覺發呆好沒意思…'], ['😢', '悲傷', '發生了很糟的事，眼淚一直掉不停…'],
+      ['😭', '難過', '心裡酸酸沉沉的，提不起任何精神…'], ['🫙', '空虛', '不知道要做什麼，心裡感覺空了一塊…'],
+      ['📉', '絕望', '怎麼做都沒用了，我好想直接放棄…'], ['🥺', '孤單', '大家都在玩，感覺都沒有人理我…'],
+      ['😴', '疲累', '好累喔，全身沒力氣，想直接倒頭大睡…'],
+    ],
+  },
+  calm: {
+    label: '飄飄火箭', icon: '☁️', type: '低活力・正向', subtitle: '我像雲一樣，全身鬆鬆的～', route: 'positive', strengthGroup: 'cruise',
+    emotions: [
+      ['🌾', '自在', '想做什麼就做什麼，完全沒有壓力！'], ['😊', '滿足', '覺得現在這樣剛剛好，很充實幸福！'],
+      ['🥹', '感動', '聽到這句話，心裡暖暖的、眼眶紅紅的…'], ['🛡️', '安心', '身邊有人陪著我，什麼都不用擔心！'],
+      ['🙏', '感謝', '謝謝別人這樣幫我，心裡好溫暖！'], ['🤝', '信任', '我很相信他，知道他一定會對我好！'],
+      ['🛋️', '放鬆', '就像趴在軟軟的沙發上，全身放鬆～'], ['🧘', '平靜', '沒有煩惱，心裡像平靜的湖面一樣…'],
+      ['☀️', '舒服', '天氣很棒、身體順暢，心情好舒暢！'],
+    ],
+  },
+};
+
+const strengths = {
+  sprint: [
+    ['🎯', '專注防護罩', '我有認真聽、沒有被干擾！'], ['🦁', '勇氣推進器', '雖然有點怕，但我還是試了！'],
+    ['💡', '智慧方向盤', '我有想出好辦法解決問題！'], ['🐢', '堅持燃料包', '就算很難，我也沒有放棄！'],
+  ],
+  cruise: [
+    ['🌈', '好奇雷達', '我主動去發現了有趣的新事物！'], ['🧘', '慢速定航儀', '我讓自己的心慢慢沉靜下來！'],
+    ['🎨', '享受過程卡', '我不急著要結果，很享受現在做的事！'], ['🌱', '自我照顧包', '我有好好休息，讓自己感覺很舒服！'],
+  ],
+};
+
+const strengthGroupByEmotion = {
+  得意: 'sprint', 狂喜: 'sprint', 興奮: 'sprint', '充滿活力': 'sprint', 快樂: 'sprint', 驚喜: 'sprint',
+  感動: 'connection', 感謝: 'connection', 安心: 'connection', 信任: 'connection', 幸福: 'connection', 期待: 'connection',
+  放鬆: 'cruise', 平靜: 'cruise', 舒服: 'cruise', 自在: 'cruise', 滿足: 'cruise', 新奇: 'cruise',
+};
+
+strengths.connection = [
+  ['🤝', '隊友聯絡器', '我有主動幫助或關心同學！'], ['👂', '傾聽接收器', '我有專心聽別人把話說完！'],
+  ['💖', '分享發射台', '我願意把好東西/快樂分給大家！'], ['🕊️', '溫和表達器', '我有好好說話，沒有生氣用罵的！'],
+];
+
+const activities = [
+  { id: 'big-breath', level: 1, name: '1 次大呼吸', duration: '約 10 秒', image: 'breath-balloon.svg', alt: '氣球慢慢變大再縮小的圖', summary: '跟著氣球吸氣 4 秒、吐氣 6 秒。', breathing: { cycles: 1, phases: [['吸氣', 4], ['吐氣', 6]] }, steps: ['先看完吸氣和吐氣的圖示。', '按「開始」後跟著氣球慢慢呼吸。'] },
+  { id: 'self-hug', waitSeconds: 5, level: 1, name: '擁抱自己', duration: '約 10 秒', image: 'self-hug.svg', alt: '小火箭雙手環抱自己的圖', summary: '雙手交叉抱住肩膀，輕輕捏一捏。', steps: ['雙手交叉，輕輕抱住自己的肩膀。', '停留 5 秒，輕輕捏一捏，再放開。'] },
+  { id: 'shoulder-release', level: 1, name: '肩頸伸展', duration: '約 10 秒', image: 'shoulder-release.svg', alt: '肩膀抬起再放下的圖', summary: '聳肩 3 秒，再慢慢放下。', steps: ['把肩膀輕輕往耳朵方向抬起，數 1、2、3。', '慢慢放下肩膀，感覺肩膀鬆開。'] },
+  { id: 'finger-sense', level: 1, name: '指尖感受卡', duration: '約 10 秒', image: 'finger-sense.svg', alt: '手指輕碰另一隻手背的圖', summary: '用指尖輕摸手背，感受手的溫度。', steps: ['用一隻手的指尖，輕輕摸另一隻手背。', '安靜感受 10 秒；不舒服就停下來。'] },
+  { id: 'bubble-breath', level: 2, name: '深呼吸氣泡飲', duration: '約 30 秒', image: 'bubble-breath.svg', alt: '杯子裡的氣泡隨呼吸上升的圖', summary: '先按開始，再跟著氣泡完成 3 次慢呼吸。', breathing: { cycles: 3, phases: [['吸氣', 4], ['吐氣', 6]] }, steps: ['先看完吸氣和吐氣的圖示。', '按「開始」後跟著氣泡完成 3 次呼吸；不舒服就停止。'] },
+  { id: 'doodle-board', level: 2, name: '煩惱塗鴉板', duration: '約 1 分鐘', image: 'doodle-board.svg', alt: '彩色線條在畫紙上自由塗畫的圖', summary: '用手指在畫板上塗黑或亂畫，把討厭的事揉掉。', interaction: 'drawing', steps: ['用手指在畫板上塗黑或亂畫約 1 分鐘。', '把注意力放在畫線上；想停就停，也可以清除畫面。'] },
+  { id: 'turning-wheel', level: 2, name: '幸運轉念卡', duration: '約 1 分鐘', image: 'turning-wheel.svg', alt: '方向盤旁出現三個想法氣泡的圖', summary: '按下開始，等方向盤停下來；指針停在哪句，就是這次抽到的話。', interaction: 'wheel', steps: ['按下「開始轉方向盤」，看著轉盤轉動。', '等轉盤停下，讀指針停在哪一句；那句就是抽到的對白。'] },
+  { id: 'window-search', level: 2, name: '窗邊尋寶', duration: '約 1 分鐘', image: 'window-search.svg', alt: '窗外雲朵和教室物件的圖', summary: '在安全的位置找 3 個有趣形狀或會動的東西。', steps: ['留在老師指定的安全位置，不要靠近窗戶或走出教室。', '用眼睛找 3 個有趣形狀或會動的東西，再回來。'] },
+  { id: 'wall-push', waitSeconds: 10, level: 3, name: '牆壁對抗', duration: '約 40 秒', image: 'wall-push.svg', alt: '雙手推牆的動作示意圖', summary: '雙手推牆 10 秒、放鬆，再做一次；有大人在旁時才進行。', steps: ['先確認前方是穩固牆面。', '雙手推牆 10 秒，放鬆，再做一次；任何不舒服都立刻停止。'] },
+  { id: 'double-inhale', level: 3, name: '星際雙重吸氣', duration: '約 30 秒', image: 'double-inhale.svg', alt: '雙重吸氣的兩個氣球示意圖', summary: '按開始後，跟著提示快速吸兩次，再慢慢吐氣，共 5 組。', breathing: { cycles: 5, phases: [['快速吸氣', 1], ['再吸一小口', 1], ['慢慢吐氣', 4]] }, steps: ['先看懂「吸、再吸、慢慢吐」的提示。', '按開始後跟著畫面做 5 組；覺得不舒服就停止。'] },
+  { id: 'high-knees', level: 3, name: '爆發型高抬腿踏步', duration: '20 秒', image: 'high-knees.svg', alt: '原地踏步的動作示意圖', summary: '在大人陪同下原地踏步 20 秒；不方便時可跳過或改選別張。', timedActivity: { seconds: 20, label: '原地踏步' }, steps: ['先確認周圍有足夠空間。', '按開始後原地踏步 20 秒；不舒服就立刻停止。'] },
+  { id: 'shake-dance', level: 3, name: '星際抖抖操', duration: '20 秒', image: 'shake-dance.svg', alt: '伸展手腳的動作示意圖', summary: '在大人陪同下輕輕抖動手腳 20 秒；不舒服就停止。', timedActivity: { seconds: 20, label: '輕輕抖動手腳' }, steps: ['先確認周圍有足夠空間。', '按開始後輕輕抖動手腳 20 秒；不舒服就立刻停止。'] },
+  { id: 'grounding-radar', level: 3, name: '5-4-3 星際著陸戰', duration: '約 1 分鐘', image: 'grounding-radar.svg', alt: '感官雷達示意圖', summary: '在原地找 5 個看見的東西、4 個方形物品、3 種聲音。', steps: ['留在原地，慢慢找 5 個看見的東西。', '再找 4 個方形物品，最後留意 3 種聲音。'] },
+];
+
+/* 發佈版：原本的 assets/*.svg 圖檔不在單檔內，改用內嵌的簡易圖示代替 */
+const ASSET_ANIMS = {
+  'breath-balloon.svg': '<animate attributeName="font-size" values="52;96;52" keyTimes="0;.4;1" dur="10s" repeatCount="indefinite"/>',
+  'bubble-breath.svg': '<animate attributeName="font-size" values="52;96;52" keyTimes="0;.4;1" dur="10s" repeatCount="indefinite"/>',
+  'self-hug.svg': '<animate attributeName="font-size" values="64;84;64" dur="3s" repeatCount="indefinite"/>',
+  'shoulder-release.svg': '<animate attributeName="y" values="108;82;108" keyTimes="0;.3;1" dur="6s" repeatCount="indefinite"/>',
+  'finger-sense.svg': '<animate attributeName="x" values="95;165;95" dur="4s" repeatCount="indefinite"/>',
+  'doodle-board.svg': '<animate attributeName="x" values="90;170;90" dur="2.4s" repeatCount="indefinite"/><animate attributeName="y" values="95;115;95" dur="1.2s" repeatCount="indefinite"/>',
+  'turning-wheel.svg': '<animateTransform attributeName="transform" type="rotate" from="0 130 80" to="360 130 80" dur="4s" repeatCount="indefinite"/>',
+  'window-search.svg': '<animate attributeName="x" values="85;175;85" dur="4s" repeatCount="indefinite"/>',
+  'wall-push.svg': '<animate attributeName="font-size" values="64;84;64" dur="2s" repeatCount="indefinite"/>',
+  'double-inhale.svg': '<animate attributeName="font-size" values="52;74;74;96;52" keyTimes="0;.12;.25;.45;1" dur="6s" repeatCount="indefinite"/>',
+  'high-knees.svg': '<animate attributeName="y" values="108;84;108" dur=".9s" repeatCount="indefinite"/>',
+  'shake-dance.svg': '<animateTransform attributeName="transform" type="rotate" values="-12 130 82;12 130 82;-12 130 82" dur=".6s" repeatCount="indefinite"/>',
+  'grounding-radar.svg': '<animateTransform attributeName="transform" type="rotate" from="0 130 82" to="360 130 82" dur="6s" repeatCount="indefinite"/>',
+};
+const ASSET_ICONS = {
+  'breath-balloon.svg': '🎈', 'self-hug.svg': '🤗', 'shoulder-release.svg': '🙆', 'finger-sense.svg': '👆',
+  'bubble-breath.svg': '🫧', 'doodle-board.svg': '🖍️', 'turning-wheel.svg': '🎡', 'window-search.svg': '🔭',
+  'wall-push.svg': '🧱', 'double-inhale.svg': '🌬️', 'high-knees.svg': '🦵', 'shake-dance.svg': '💃',
+  'grounding-radar.svg': '📡',
+};
+function assetSrc(name) {
+  const icon = ASSET_ICONS[name] || '✦';
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 260 160"><rect width="260" height="160" fill="#e8f3ea"/><text x="130" y="102" font-size="72" text-anchor="middle">${icon}${ASSET_ANIMS[name] || ''}</text></svg>`;
+  return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+}
+
+/* 瀏覽器儲存：全部包 try/catch，讀不到時退回記憶體 */
+const memStore = {};
+function storeGet(kind, key) {
+  try { return window[kind].getItem(key); } catch { return memStore[kind + key] ?? null; }
+}
+function storeSet(kind, key, value) {
+  try { window[kind].setItem(key, value); } catch { memStore[kind + key] = value; }
+}
+function storeRemove(kind, key) {
+  try { window[kind].removeItem(key); } catch { delete memStore[kind + key]; }
+}
+
+const DAILY_LIMIT = 2;
+const TEACHER_STAGES = ['teacherGate', 'teacherAuthUnavailable', 'teacherDashboard'];
+const NEGATIVE_ROCKETS = ['噴火火箭', '沒電火箭'];
+const TESTER_ID = '6年0班-0';
+const isTester = () => Boolean(session.profile && session.profile.id === TESTER_ID);
+const teacherUI = { view: 'students', studentId: null, notice: '', filter: { group: '', urgency: '', help: '', time: '' } };
+const MIN_GAP_MS = 40 * 60 * 1000;
+const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+/* ---------- 後端連線（Google Apps Script） ----------
+   網址寫在 config.js。後端沒設定或連不上時，學生端仍可使用，只是資料只存在這台裝置。 */
+const API_URL = (window.APP_CONFIG && window.APP_CONFIG.API_URL) || '';
+const apiEnabled = () => /^https:\/\/script\.google\.com\//.test(API_URL);
+
+async function api(action, payload = {}, timeoutMs = 8000) {
+  if (!apiEnabled()) return null;
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    /* 用純文字送出，瀏覽器不會先發 preflight 請求，Apps Script 才收得到 */
+    const res = await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action, ...payload }), signal: ctrl.signal });
+    return await res.json();
+  } catch { return null; } finally { clearTimeout(timer); }
+}
+
+/* 把雲端的使用時間、勳章、方法紀錄合併回這台裝置 */
+async function syncProfile(profile) {
+  if (!profile) return false;
+  const res = await api('getStudent', { id: profile.id });
+  if (!res || !res.ok) return false;
+  const byAt = new Map([...(res.records || []), ...(profile.records || [])].map((r) => [r.at, r]));
+  profile.records = [...byAt.values()].sort((a, b) => a.at - b.at);
+  profile.starts = [...new Set([...(res.starts || []), ...(profile.starts || [])])].sort((a, b) => a - b);
+  const badges = { ...(res.badges || {}) };
+  Object.keys(profile.badges || {}).forEach((k) => { badges[k] = Math.max(badges[k] || 0, profile.badges[k]); });
+  profile.badges = badges;
+  return true;
+}
+
+/* 只有後端確定寄出通知信，才回傳 true（畫面才會顯示「已通知老師」） */
+async function sendHelp(entry) {
+  const p = session.profile;
+  const res = await api('help', { id: p ? p.id : '', who: entry.who, emotion: entry.emotion, rating: entry.rating }, 12000);
+  return Boolean(res && res.ok && res.emailed);
+}
+
+/* 紀錄先放進待送清單，網路不穩時下次再補送，不會遺失 */
+const OUTBOX_KEY = 'emotion-navigator-outbox-v1';
+function outboxRead() { try { return JSON.parse(storeGet('localStorage', OUTBOX_KEY) || '[]'); } catch { return []; } }
+function outboxWrite(list) { storeSet('localStorage', OUTBOX_KEY, JSON.stringify(list)); }
+let flushing = false;
+async function flushOutbox() {
+  if (flushing || !apiEnabled()) return;
+  flushing = true;
+  try {
+    const rest = [];
+    for (const item of outboxRead()) {
+      const res = await api('saveRecord', item, 10000);
+      if (!res || !(res.ok || res.error === 'bad_record' || res.error === 'bad_id')) rest.push(item);
+    }
+    outboxWrite(rest);
+  } finally { flushing = false; }
+}
+
+/* ---------- 教師端：登入由後端驗證，資料用輪詢更新 ---------- */
+const teacherData = { records: [], help: [], remote: false, sig: '' };
+let teacherPoll = null;
+function unwatchTeacherData() {
+  if (teacherPoll) window.clearInterval(teacherPoll);
+  teacherPoll = null;
+  if (teacherUI.token) api('teacherLogout', { token: teacherUI.token });
+  teacherUI.token = null;
+  teacherData.records = []; teacherData.help = []; teacherData.remote = false; teacherData.sig = '';
+}
+async function loadTeacherData() {
+  const res = await api('teacherData', { token: teacherUI.token }, 15000);
+  if (!res) return;
+  if (res.error === 'unauthorized') {
+    unwatchTeacherData();
+    setStage('teacherGate');
+    const err = document.querySelector('#teacher-error');
+    if (err) err.textContent = '登入已逾時，請重新登入。';
+    return;
+  }
+  if (!res.ok) return;
+  const sig = JSON.stringify([res.records, res.help]);
+  if (sig === teacherData.sig) return;
+  teacherData.sig = sig;
+  teacherData.records = res.records || [];
+  teacherData.help = res.help || [];
+  teacherData.remote = true;
+  if (session.stage === 'teacherDashboard') render();
+}
+async function watchTeacherData() {
+  if (teacherPoll) window.clearInterval(teacherPoll);
+  await loadTeacherData();
+  teacherPoll = window.setInterval(loadTeacherData, 20000);
+}
+async function teacherLogin(account, password) {
+  const err = document.querySelector('#teacher-error');
+  if (!apiEnabled()) { err.textContent = '尚未設定後端網址（請編輯 config.js）。'; return; }
+  err.textContent = '登入中…';
+  const res = await api('teacherLogin', { account, password }, 12000);
+  if (!res) { err.textContent = '連不上伺服器，請確認網路與後端設定。'; return; }
+  if (!res.ok) { err.textContent = res.message || '帳號或密碼錯誤。'; return; }
+  teacherUI.token = res.token;
+  teacherUI.view = 'students';
+  session.expired = false;
+  await watchTeacherData();
+  setStage('teacherDashboard');
+}
+
+const SESSION_LIMIT_MS = 5 * 60 * 1000;
+const PROFILE_STORAGE_KEY = 'emotion-navigator-profiles-v1';
+const TIMER_STORAGE_PREFIX = 'emotion-navigator-session-start-v1:';
+const TEACHER_HELP_MODE = 'local-preview-no-backend';
+
+const stepTitles = {
+  profile: ['開始之前', '請輸入年級、班級與座號', 1],
+  teacherDashboard: ['教師管理', '學生使用紀錄', 1],
+  toolbox: ['個人排行榜', '對我最有幫助的調適方法', 4],
+  teacherGate: ['教師管理入口', '教師登入後才能管理資料', 1],
+  teacherAuthUnavailable: ['教師驗證尚未設定', '本機資料暫不開放清除', 1],
+  start: ['準備開始', '準備好了就出發', 1],
+  stickerCollection: ['我的優勢貼紙', '看看目前收集了哪些力量', 4],
+  state: ['第 1 步 · 找到現在的狀態', '你的火箭現在怎麼了？', 1],
+  emotion: ['第 2 步 · 聽聽火箭訊號', '哪一種感覺最接近？', 2],
+  rating: ['第 3 步 · 感受有多強？', '用自己的感覺選一個數字', 3],
+  strengths: ['第 4 步 · 收集一個優勢', '這份好感覺裡有什麼力量？', 4],
+  activityList: ['試試看這個方法吧', '', 4],
+  activityGuide: ['跟著圖片一步一步做', '不舒服可以隨時停下', 4],
+  activityCheck: ['活動回報 · 由你自己告訴我們', '你有跟著圖片做嗎？', 4],
+  review: ['回頭看看 · 感受有變化嗎？', '再選一次現在的感受強度', 4],
+  increased: ['我們一起換個方法', '感覺變強了也沒關係', 4],
+  adultGate: ['先找大人陪你', '高強度時先不要獨自繼續', 4],
+  supportStop: ['已停止自助推薦 · 請找大人陪你', '現在先不繼續選方法', 4],
+  sessionStop: ['本次時間已到 · 請找大人陪你', '先停止自己選方法', 4],
+  done: ['這一趟先到這裡', '謝謝你照顧自己的感受', 4],
+};
+
+const session = {
+  stage: 'profile', state: null, emotion: null, initialRating: 3, rating: 3,
+  preActivityRating: null, highCycleStartRating: null, selectedStrengths: [], selectedActivity: null,
+  activeMethodLevel: null, activityLevelOverride: null, recommendedActivityId: null,
+  triedActivities: [], completedActivities: [], checkedSteps: [], activityReports: [],
+  adultPresent: false, interactionDone: {}, selectedReframe: null,
+  consecutiveFiveRatings: 0, stopReason: null, profile: null, highLevelStep: 0,
+  sessionStartedAt: null, sessionTimerId: null, activityTimerId: null, breathingRun: null,
+};
+
+const app = document.querySelector('#app');
+const helpDialog = document.querySelector('#help-dialog');
+
+function setStage(stage) {
+  session.stage = stage;
+  render();
+}
+
+function stopSelfGuidance(reason) {
+  stopSessionTimer();
+  session.stopReason = reason;
+  if (reason === 'session-time') session.expired = true;
+  if (session.state && states[session.state].route === 'negative' && session.rating >= 4) session.needsTeacher = true;
+  commitRecord();
+  setStage(reason === 'session-time' ? 'sessionStop' : 'supportStop');
+  if (session.needsTeacher && reason !== 'session-time') simulateTeacherCall();
+}
+
+function updateHighIntensityClock() {
+  const timer = document.querySelector('#session-timer');
+  const clock = document.querySelector('#session-clock');
+  const showTimer = session.sessionStartedAt !== null && session.stage !== 'profile' && session.stage !== 'start';
+  timer.hidden = !showTimer;
+  if (!showTimer) return;
+  const remaining = Math.max(0, SESSION_LIMIT_MS - (Date.now() - session.sessionStartedAt));
+  const seconds = Math.ceil(remaining / 1000);
+  clock.textContent = `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`;
+  timer.classList.toggle('urgent', remaining <= 60 * 1000);
+}
+
+function recordNegativeRating(value) {
+  if (states[session.state].route !== 'negative') return false;
+  if (value === 5) {
+    session.consecutiveFiveRatings += 1;
+    if (session.consecutiveFiveRatings >= 2) {
+      stopSelfGuidance('two-fives');
+      return true;
+    }
+    return false;
+  }
+
+  session.consecutiveFiveRatings = 0;
+  return false;
+}
+
+function readProfiles() {
+  try { return JSON.parse(storeGet('localStorage', PROFILE_STORAGE_KEY) || '{}'); }
+  catch { return {}; }
+}
+
+function saveProfiles(profiles) {
+  storeSet('localStorage', PROFILE_STORAGE_KEY, JSON.stringify(profiles));
+}
+
+function profileTimerKey(profile) {
+  return `${TIMER_STORAGE_PREFIX}${profile.id}`;
+}
+
+function stopSessionTimer(clearStored = false) {
+  if (session.sessionTimerId !== null) window.clearInterval(session.sessionTimerId);
+  session.sessionTimerId = null;
+  if (clearStored && session.profile) storeRemove('sessionStorage', profileTimerKey(session.profile));
+  session.sessionStartedAt = null;
+  updateHighIntensityClock();
+}
+
+function startSessionTimer() {
+  if (isTester()) { session.sessionStartedAt = null; updateHighIntensityClock(); return; }
+  const stored = Number(storeGet('sessionStorage', profileTimerKey(session.profile)));
+  session.sessionStartedAt = stored || Date.now();
+  storeSet('sessionStorage', profileTimerKey(session.profile), String(session.sessionStartedAt));
+  if (Date.now() - session.sessionStartedAt >= SESSION_LIMIT_MS) {
+    session.expired = true;
+    session.stage = 'sessionStop';
+    render();
+    return;
+  }
+  if (session.sessionTimerId !== null) window.clearInterval(session.sessionTimerId);
+  session.sessionTimerId = window.setInterval(() => {
+    updateHighIntensityClock();
+    if (TEACHER_STAGES.includes(session.stage)) return;
+    if (Date.now() - session.sessionStartedAt >= SESSION_LIMIT_MS) stopSelfGuidance('session-time');
+  }, 250);
+}
+
+function beginSession() {
+  session.state = null;
+  session.emotion = null;
+  session.initialRating = 3;
+  session.rating = 3;
+  session.preActivityRating = null;
+  session.highCycleStartRating = null;
+  session.activeMethodLevel = null;
+  session.activityLevelOverride = null;
+  session.recommendedActivityId = null;
+  session.selectedStrengths = [];
+  session.selectedActivity = null;
+  session.triedActivities = [];
+  session.completedActivities = [];
+  session.checkedSteps = [];
+  session.activityReports = [];
+  session.adultPresent = false;
+  session.consecutiveFiveRatings = 0;
+  session.highLevelStep = 0;
+  session.highIntensityCycle = false;
+  session.escalated = false;
+  session.attempts = [];
+  session.lastActivityId = null;
+  session.needsTeacher = false;
+  session.toolboxMode = false;
+  session.expired = false;
+  session.recordSaved = false;
+  session.stopReason = null;
+  session.gateMessage = null;
+  session.helpCount = 0;
+  session.teacherPreview = false;
+  session.activityLevelOverride = null;
+  session.recommendedActivityId = null;
+  session.retrySameLevel = false;
+  session.activeMethodLevel = null;
+  session.sessionStartedAt = null;
+  session.stage = 'state';
+  startSessionTimer();
+  render();
+}
+
+function updateProfile(profile) {
+  if (!profile) return;
+  const profiles = readProfiles();
+  profiles[profile.id] = profile;
+  saveProfiles(profiles);
+  session.profile = profile;
+}
+
+function earnSelectedStickers() {
+  const group = strengthGroupByEmotion[session.emotion];
+  const profile = readProfiles()[session.profile.id] || session.profile;
+  const earned = session.selectedStrengths.map((index) => `${group}-${index}`);
+  profile.stickers = [...new Set([...(profile.stickers || []), ...earned])];
+  profile.badges = profile.badges || {};
+  earned.forEach((key) => { profile.badges[key] = Math.min(5, (profile.badges[key] || 0) + 1); });
+  updateProfile(profile);
+}
+
+function setProfileFromForm() {
+  const grade = document.querySelector('#grade-input').value;
+  const className = document.querySelector('#class-input').value.trim().replace(/班$/, '');
+  const seat = document.querySelector('#seat-input').value.trim().replace(/號$/, '');
+  const error = document.querySelector('#profile-error');
+  if (!/^[\u4e00-\u9fa5\d]{1,4}$/.test(className) || !/^\d{1,3}$/.test(seat)) {
+    error.textContent = '請輸入班別（例如 丙 或 3）與 1 到 3 位數的座號。';
+    return;
+  }
+  const group = `${grade}年${className}班`;
+  const id = `${group}-${seat}`;
+  const profiles = readProfiles();
+  session.profile = profiles[id] || { id, group, seat, stickers: [] };
+  profiles[id] = session.profile;
+  saveProfiles(profiles);
+  const loggedIn = session.profile;
+  syncProfile(loggedIn).then((ok) => {
+    if (!ok) return;
+    const ps = readProfiles();
+    ps[loggedIn.id] = loggedIn;
+    saveProfiles(ps);
+  });
+  setStage('start');
+}
+
+function simulateTeacherCall() {
+  const title = document.querySelector('#help-title');
+  const eyebrow = document.querySelector('#help-eyebrow');
+  const content = document.querySelector('#help-content');
+  const done = document.querySelector('#help-done');
+  helpDialog.dataset.integrationMode = TEACHER_HELP_MODE;
+  title.textContent = '正在通知老師';
+  eyebrow.textContent = '緊急協助';
+  done.hidden = true;
+  content.innerHTML = '<div class="call-progress"><span class="call-spinner" aria-hidden="true"></span><strong>正在通知老師…</strong><small>請先留在安全的位置。</small></div>';
+  helpDialog.showModal();
+  const who = session.profile ? `${session.profile.group} ${session.profile.seat}號` : '未登入';
+  sendHelp({ who, at: Date.now(), emotion: session.emotion || '', rating: session.rating || 0 }).then((sent) => {
+    if (!helpDialog.open) return;
+    title.textContent = sent ? '已通知老師' : '請現在找老師';
+    content.innerHTML = sent
+      ? '<div class="call-success"><span aria-hidden="true">✓</span><strong>已通知老師，請在原地稍等</strong><p>老師看到通知後會來找你。</p></div>'
+      : '<div class="call-success"><span aria-hidden="true">!</span><strong>這台裝置目前無法自動通知老師</strong><p>請走到老師身邊，或舉手呼喚老師。</p></div>';
+    done.hidden = false;
+  });
+}
+
+function spinReframeWheel() {
+  if (session.wheelSpinning) return;
+  const phrases = [
+    ['A', '還好沒有更糟糕！', 0],
+    ['B', '這代表我下次知道怎麼做囉！', 240],
+    ['C', '沒關係，我已經盡力了！', 120],
+  ];
+  const selected = phrases[Math.floor(Math.random() * phrases.length)];
+  session.wheelSpinning = true;
+  session.selectedReframe = null;
+  session.wheelRotation = 360 * 5 + selected[2];
+  render();
+  window.setTimeout(() => {
+    session.wheelSpinning = false;
+    session.selectedReframe = `${selected[0]}：「${selected[1]}」`;
+    session.interactionDone.wheel = true;
+    session.interactionDone.reframe = true;
+    render();
+  }, 1600);
+}
+
+function progressFor(stage) {
+  return ['state', 'emotion', 'rating'].includes(stage) ? ({ state: 25, emotion: 50, rating: 75 })[stage] : 100;
+}
+
+function render() {
+  const [label, title, number] = stepTitles[session.stage];
+  document.querySelector('#step-label').textContent = label;
+  document.querySelector('#step-title').textContent = title;
+  const stepCount = `${String(number).padStart(2, '0')} / 04`;
+  document.querySelector('#step-count').textContent = TEACHER_STAGES.includes(session.stage) ? '' : stepCount;
+  document.querySelector('#progress-fill').style.width = `${progressFor(session.stage)}%`;
+  updateProfileButtonLabel();
+  document.querySelector('#stickers-button').hidden = !session.profile || session.expired;
+  document.querySelector('#toolbox-button').hidden = !session.profile || session.expired;
+  const teacherMode = TEACHER_STAGES.includes(session.stage) || Boolean(session.teacherPreview);
+  document.querySelector('.help-button').hidden = teacherMode;
+  document.querySelector('#teacher-logout').hidden = !teacherMode;
+  app.innerHTML = screens[session.stage]();
+  /* 求助只保留右上角的「找大人幫忙」 */
+  app.querySelectorAll('[data-action="help"]').forEach((el) => el.remove());
+  updateHighIntensityClock();
+  if (session.stage === 'activityGuide' && session.selectedActivity === 'doodle-board') setupDrawingCanvas();
+  if (session.stage === 'activityGuide') startWaitClock();
+  if (session.stage === 'toolbox') animateCounts();
+}
+
+function updateProfileButtonLabel() {
+  const button = document.querySelector('#profile-button');
+  button.hidden = !session.profile;
+  if (!session.profile) return;
+  const fullLabel = `切換使用者，目前是 ${session.profile.group} ${session.profile.seat}號`;
+  button.textContent = window.matchMedia('(max-width: 620px)').matches
+    ? '切換'
+    : `${session.profile.group} ${session.profile.seat}號 · 切換`;
+  button.setAttribute('aria-label', fullLabel);
+}
+
+function guideComplete() {
+  const item = activities.find((activity) => activity.id === session.selectedActivity);
+  const allStepsChecked = session.checkedSteps.length === item.steps.length;
+  if (item.interaction === 'drawing') return allStepsChecked && session.interactionDone.drawing;
+  if (item.interaction === 'wheel') return Boolean(session.interactionDone.wheel && session.interactionDone.reframe);
+  if (item.breathing || item.timedActivity) return allStepsChecked && session.activityTimer?.phase === 'complete';
+  return allStepsChecked && (!item.waitSeconds || Boolean(session.waitDone));
+}
+
+function activityTimerMarkup(item) {
+  if (!item.breathing && !item.timedActivity) return '';
+  const timer = session.activityTimer || { phase: 'ready', cycle: 0, seconds: 0, phaseLabel: '' };
+  const checked = session.checkedSteps.length === item.steps.length;
+  let message = checked ? '準備好後，按下開始；畫面會先倒數 3 秒。' : '先做完上面的步驟並打勾，開始按鈕才會亮起。';
+  let button = `<button class="button button-primary" data-action="start-activity-timer" ${checked ? '' : 'disabled'}>開始前倒數</button>`;
+  if (timer.phase === 'countdown') {
+    message = '準備開始';
+    button = `<span class="timer-big-number">${timer.seconds}</span>`;
+  } else if (timer.phase === 'active') {
+    message = timer.phaseLabel;
+    button = `<button class="button button-secondary" data-action="stop-activity-timer">停止</button>`;
+  } else if (timer.phase === 'complete') {
+    message = '這個計時活動完成了。可以休息一下，再按下方按鈕。';
+    button = '<span class="timer-finished">✓ 完成</span>';
+  }
+  const cycle = item.breathing ? `第 ${Math.min(timer.cycle + 1, item.breathing.cycles)} / ${item.breathing.cycles} 組` : item.timedActivity.label;
+  return `<div class="activity-timer-panel" id="activity-timer-panel" aria-live="polite">
+    <div class="activity-timer-copy"><strong>${message}</strong><span>${cycle}</span></div>
+    <span class="activity-timer-value">${timer.phase === 'active' ? `${timer.seconds} 秒` : timer.phase === 'countdown' ? timer.seconds : '準備'}</span>${button}
+    <p>跟著畫面做就好；若頭暈或不舒服，請按「停止」並告訴大人。</p>
+  </div>`;
+}
+
+function updateActivityTimerPanel() {
+  const item = activities.find((activity) => activity.id === session.selectedActivity);
+  const panel = app.querySelector('#activity-timer-panel');
+  if (!panel || !item) return;
+  const holder = document.createElement('div');
+  holder.innerHTML = activityTimerMarkup(item);
+  panel.replaceWith(holder.firstElementChild);
+  const ready = app.querySelector('[data-action="activity-ready"]');
+  if (ready) ready.disabled = !guideComplete();
+}
+
+function stopActivityTimer() {
+  if (session.activityTimerId !== null) window.clearInterval(session.activityTimerId);
+  session.activityTimerId = null;
+  session.activityTimer = { phase: 'ready', cycle: 0, seconds: 0, phaseLabel: '' };
+  updateActivityTimerPanel();
+}
+
+function startActivityTimer() {
+  const item = activities.find((activity) => activity.id === session.selectedActivity);
+  session.activityTimer = { phase: 'countdown', cycle: 0, seconds: 3, phaseLabel: '' };
+  updateActivityTimerPanel();
+  session.activityTimerId = window.setInterval(() => {
+    const timer = session.activityTimer;
+    if (timer.phase === 'countdown') {
+      timer.seconds -= 1;
+      if (timer.seconds <= 0) {
+        timer.phase = 'active';
+        timer.cycle = 0;
+        timer.phaseIndex = 0;
+        timer.seconds = item.breathing ? item.breathing.phases[0][1] : item.timedActivity.seconds;
+        timer.phaseLabel = item.breathing ? item.breathing.phases[0][0] : item.timedActivity.label;
+      }
+    } else if (timer.phase === 'active') {
+      timer.seconds -= 1;
+      if (timer.seconds <= 0) {
+        if (!item.breathing || timer.phaseIndex + 1 < item.breathing.phases.length) {
+          if (item.breathing) {
+            timer.phaseIndex += 1;
+            const [label, seconds] = item.breathing.phases[timer.phaseIndex];
+            timer.phaseLabel = label;
+            timer.seconds = seconds;
+          } else {
+            timer.phase = 'complete';
+          }
+        } else {
+          timer.cycle += 1;
+          if (timer.cycle >= item.breathing.cycles) timer.phase = 'complete';
+          else {
+            timer.phaseIndex = 0;
+            const [label, seconds] = item.breathing.phases[0];
+            timer.phaseLabel = label;
+            timer.seconds = seconds;
+          }
+        }
+      }
+    }
+    if (timer.phase === 'complete') {
+      window.clearInterval(session.activityTimerId);
+      session.activityTimerId = null;
+    }
+    updateActivityTimerPanel();
+  }, 1000);
+}
+
+function renderStickerCollection() {
+  const profile = readProfiles()[session.profile.id] || session.profile;
+  const groups = [['sprint', '衝刺型'], ['connection', '連結型'], ['cruise', '巡航型']];
+  return `<p class="selection-note">${esc(profile.group)} ${esc(profile.seat)}號的勳章收藏｜每收集一次，勳章會更清楚，集滿 5 次就會完整發光</p>
+    <div class="sticker-groups">${groups.map(([group, title]) => `<section class="sticker-group"><h3>${title}</h3><div class="sticker-shelf">${strengths[group].map(([icon, name], index) => {
+      const count = Math.min(5, (profile.badges || {})[`${group}-${index}`] || 0);
+      const opacity = Math.min(1, 0.05 + 0.19 * count);
+      return `<div class="badge"><div class="badge-medal" style="opacity:${opacity}">${icon}</div><strong>${name}</strong><div class="badge-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${count * 20}"><span style="width:${count * 20}%"></span></div><small>${count * 20}%</small></div>`;
+    }).join('')}</div></section>`).join('')}</div>
+    <div class="button-row"><button class="button button-secondary" data-action="logout">結束體驗</button><button class="button button-primary" data-action="restart">回到火箭選擇</button></div>`;
+}
+
+function setupDrawingCanvas() {
+  const canvas = app.querySelector('#doodle-canvas');
+  const context = canvas.getContext('2d');
+  context.lineWidth = 7;
+  context.lineCap = 'round';
+  context.strokeStyle = '#181818';
+  let drawing = false;
+  const point = (event) => {
+    const bounds = canvas.getBoundingClientRect();
+    return { x: (event.clientX - bounds.left) * (canvas.width / bounds.width), y: (event.clientY - bounds.top) * (canvas.height / bounds.height) };
+  };
+  canvas.addEventListener('pointerdown', (event) => {
+    drawing = true;
+    canvas.setPointerCapture(event.pointerId);
+    const position = point(event);
+    context.beginPath();
+    context.arc(position.x, position.y, 4, 0, Math.PI * 2);
+    context.fill();
+    context.beginPath();
+    context.moveTo(position.x, position.y);
+    startDrawClock();
+  });
+  canvas.addEventListener('pointermove', (event) => {
+    if (!drawing) return;
+    const position = point(event);
+    context.lineTo(position.x, position.y);
+    context.stroke();
+    startDrawClock();
+  });
+  canvas.addEventListener('pointerup', () => { drawing = false; });
+  canvas.addEventListener('pointercancel', () => { drawing = false; });
+}
+
+function renderStrengths() {
+  const group = strengthGroupByEmotion[session.emotion];
+  const heading = { sprint: '衝刺型優勢貼紙', connection: '連結型優勢貼紙', cruise: '巡航型優勢貼紙' }[group];
+  return `<p class="selection-note">${heading}｜可選 1–2 張，也可以跳過。</p>
+    <div class="strength-list" role="group" aria-label="選擇最多兩種優勢">
+      ${strengths[group].map(([icon, name, text], index) => `
+        <button class="strength-choice ${session.selectedStrengths.includes(index) ? 'selected' : ''}" type="button" aria-pressed="${session.selectedStrengths.includes(index)}" data-action="strength" data-value="${index}">
+          <span class="strength-icon" aria-hidden="true">${icon}</span><span><strong>${name}</strong><small>${text}</small></span>
+        </button>`).join('')}
+    </div><div class="button-row"><button class="button button-secondary" data-action="back">上一步</button><button class="button button-primary" data-action="finish-positive">收下貼紙</button></div>`;
+}
+
+function availableActivities() {
+  const level = session.highIntensityCycle ? session.highLevelStep : session.activityLevelOverride ?? (session.rating <= 2 ? 1 : 2);
+  return activities.filter((item) => {
+    if (session.triedActivities.includes(item.id)) return false;
+    if (session.highIntensityCycle && !session.adultPresent) return false;
+    return item.level === level;
+  });
+}
+
+function recommendAnotherActivity() {
+  const alternatives = availableActivities().filter((item) => item.id !== session.recommendedActivityId);
+  if (!alternatives.length) return false;
+  session.recommendedActivityId = alternatives[Math.floor(Math.random() * alternatives.length)].id;
+  render();
+  return true;
+}
+
+function renderActivityList() {
+  const level = session.highIntensityCycle ? session.highLevelStep : session.activityLevelOverride ?? (session.rating <= 2 ? 1 : 2);
+  const available = availableActivities();
+  if (!available.some((item) => item.id === session.recommendedActivityId)) {
+    session.recommendedActivityId = available.length ? available[Math.floor(Math.random() * available.length)].id : null;
+  }
+  const item = available.find((activity) => activity.id === session.recommendedActivityId);
+  const latestRise = session.rating > session.preActivityRating;
+  const retrySameLevel = session.retrySameLevel;
+  const highNotice = session.highIntensityCycle
+    ? `<div class="safety-banner"><strong>第 ${level} 級方法（共 3 級）。</strong>請由大人陪同；不舒服就停止或找大人。完成這一級後再進入下一級，頂端整趟倒數不會重設。</div>` : '';
+  const message = latestRise
+    ? '<p class="feedback-note">感覺比剛才更強了。先停一停，換一種沒試過的方法；如果不想繼續，請找大人陪你。</p>'
+    : retrySameLevel
+      ? `<p class="feedback-note">剛才的方法沒有讓「${session.emotion}」的分數下降。這次先試一張同級、不同的方法。</p>`
+      : `<p class="feedback-note">導航員先抽出一張第 ${level} 級方法。一次只試一種，完成後再回來評估。</p>`;
+  if (!item) {
+    const exhaustedContent = session.highIntensityCycle
+      ? `<h3>這一級沒有其他可用方法</h3><p>請找老師或信任的大人陪你決定下一步，不要獨自繼續。</p><div class="button-row end"><button class="button button-primary" data-action="help">請老師來</button></div>`
+      : `<h3>這一級的方法都試過了</h3><p>先重新評估「${session.emotion}」的強度，再決定要不要找大人幫忙；也可以結束這一趟。</p><div class="button-row"><button class="button button-secondary" data-action="help">請老師來</button><button class="button button-secondary" data-action="review-after-exhaustion">再測一次感受</button><button class="button button-primary" data-action="finish-without-activity">結束這一趟</button></div>`;
+    return `${highNotice}<div class="done-panel"><span class="done-mark">♡</span>${exhaustedContent}</div>`;
+  }
+  return `<div class="activity-grid" role="group" aria-label="本次隨機推薦的調節方式">
+    <article class="activity-card">
+      <img src="${assetSrc(item.image)}" alt="${item.alt}" width="260" height="160">
+      <div class="activity-card-copy"><div class="activity-card-meta"><span>${item.duration}</span></div>
+      <h3>${item.name}</h3><p>${item.summary}</p>
+      <button class="button button-secondary activity-pick" data-action="choose-activity" data-value="${item.id}">開始導航</button></div>
+    </article>
+    </div>`;
+}
+
+const screens = {
+  profile() {
+    return `<form class="profile-form" id="profile-form">
+      <label>年級<select id="grade-input" name="grade" required>${[1,2,3,4,5,6].map((grade)=>`<option value="${grade}" ${grade===6?'selected':''}>${grade} 年級</option>`).join('')}</select></label>
+      <label>班別<input id="class-input" name="class" autocomplete="off" maxlength="4" placeholder="例如：丙 或 3" required></label>
+      <label>座號<input id="seat-input" name="seat" inputmode="numeric" autocomplete="off" maxlength="3" placeholder="例如：8" required></label>
+      
+      <p class="profile-error" id="profile-error" role="alert"></p>
+      <div class="button-row end"><button class="button button-primary" type="submit">建立個人資料</button></div>
+      <div class="profile-data-control"><button class="button button-link" type="button" data-action="teacher-login">教師管理</button></div>
+    </form>`;
+  },
+  teacherGate() {
+    return `<form class="profile-form teacher-login-form" id="teacher-login-form"><label>教師帳號<input name="teacher-account" autocomplete="username" required></label><label>教師密碼<input name="teacher-password" type="password" autocomplete="current-password" required></label><p class="profile-error" id="teacher-error" role="alert"></p><div class="button-row"><button class="button button-secondary" type="button" data-action="back-to-profile">返回</button><button class="button button-primary" type="submit">登入驗證</button></div></form>`;
+  },
+  teacherAuthUnavailable() {
+    return `<div class="safety-banner"><strong>教師驗證尚未設定。</strong><br>此原型沒有校方帳號服務。為避免學生自行清除資料，個人資料清除功能維持鎖定；剛才輸入的帳密沒有儲存。</div><div class="button-row end"><button class="button button-primary" data-action="back-to-profile">返回個人資料</button></div>`;
+  },
+  start() {
+    return `<div class="done-panel start-panel"><span class="done-mark">🚀</span><h3>${session.profile.group} ${session.profile.seat}號，準備好了嗎？</h3>${session.gateMessage ? `<div class="safety-banner">${session.gateMessage}</div>` : ''}<div class="button-row end"><button class="button button-primary" data-action="begin-session">開始情緒導航</button></div></div>`;
+  },
+  stickerCollection: renderStickerCollection,
+  toolbox() {
+    const list = personalRanking();
+    const body = list.length ? kahootList(list) : '<p class="selection-note">你還沒有完成的方法紀錄，先去試試看，這裡就會出現你的專屬排行榜！</p>';
+    return `<p class="selection-note" style="margin:0 0 12px">依每種方法幫你降低的級數排名</p>${body}<div class="button-row end"><button class="button button-primary" data-action="close-toolbox">返回導航</button></div>`;
+  },
+  teacherDashboard() {
+    const all = collectStudents();
+    const tab = (view, label) => `<button class="tab ${teacherUI.view === view || (view === 'students' && teacherUI.view === 'student') ? 'active' : ''}" data-action="teacher-tab" data-value="${view}">${label}</button>`;
+    const tabs = `<div class="tab-row">${tab('students', '學生資料')}${tab('tools', '調適工具箱')}</div>`;
+    const status = `<p class="selection-note">${teacherData.remote ? '已連線後端，顯示所有裝置的紀錄（每 20 秒自動更新）。' : (apiEnabled() ? '尚未取得後端資料。' : '尚未設定後端網址，目前只顯示這個瀏覽器的紀錄。')}${teacherUI.notice ? ` ${esc(teacherUI.notice)}` : ''}</p>`;
+    if (teacherUI.view === 'tools') {
+      const rank = rankFrom(all.flatMap((st) => st.records.flatMap((r) => r.attempts || [])));
+      return `${tabs}<h3>全體學生有效方法排行榜</h3><p class="selection-note">已排除前後測不完整、後測高於前測的紀錄。</p>${rank.length ? kahootList(rank) : '<p class="selection-note">資料還不足。</p>'}<h3 style="margin-top:20px">全部調適方法（點進去看使用方式）</h3><div class="activity-grid">${activities.map((item) => `<article class="activity-card"><img src="${assetSrc(item.image)}" alt="${item.alt}" width="260" height="160"><div class="activity-card-copy"><div class="activity-card-meta"><span>第 ${item.level} 級</span><span>${item.duration}</span></div><h3>${item.name}</h3><p>${item.summary}</p><button class="button button-secondary activity-pick" data-action="choose-activity" data-value="${item.id}">查看使用方式</button></div></article>`).join('')}</div>`;
+    }
+    if (teacherUI.view === 'student') {
+      const st = all.find((x) => x.id === teacherUI.studentId);
+      if (!st) return `${tabs}<p class="selection-note">找不到這位學生的紀錄。</p>`;
+      const rows = [...st.records].sort((a, b) => b.at - a.at).map((r) => `<tr><td>${new Date(r.at).toLocaleString('zh-TW')}</td><td>${esc(r.state)}・${esc(r.emotion)}</td><td>${(r.attempts || []).length ? r.attempts.map((a) => `${esc(a.name)}：${esc(attemptText(a))}`).join('<br>') : '—'}</td></tr>`).join('');
+      return `${tabs}<div class="button-row" style="margin:0 0 10px"><button class="button button-secondary" data-action="teacher-tab" data-value="students">← 回學生列表</button></div><h3>${esc(st.group)} ${esc(st.seat)}號（共 ${st.records.length} 次）</h3><div style="overflow-x:auto"><table class="report-table"><thead><tr><th>時間</th><th>火箭・情緒</th><th>調適方法（前→後測）</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+    }
+    const groups = [...new Set(all.map((st) => st.group))].sort();
+    const sel = (key, label, opts) => `<label>${label}<select data-filter="${key}">${opts.map(([v, t]) => `<option value="${esc(v)}" ${teacherUI.filter[key] === v ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select></label>`;
+    const bar = `<div class="filter-bar">${sel('group', '班級', [['', '全部'], ...groups.map((g) => [g, g])])}${sel('urgency', '緊急程度', [['', '全部'], ['3', '高'], ['2', '中'], ['1', '低']])}${sel('help', '找大人次數', [['', '全部'], ['1', '1 次以上'], ['3', '3 次以上'], ['5', '5 次以上']])}${sel('time', '最近使用', [['', '全部'], ['today', '今天'], ['week', '近 7 天']])}<button class="button button-secondary" data-action="teacher-export">輸出 Excel</button></div>`;
+    const help = teacherData.help.length ? `<div class="help-alert"><strong>求助紀錄</strong><br>${teacherData.help.slice(0, 5).map((h) => `${new Date(h.at).toLocaleTimeString('zh-TW')} ${esc(h.who)}${h.emotion ? `（${esc(h.emotion)}）` : ''}`).join('<br>')}</div>` : '';
+    const list = filterStudents(all);
+    const rows = list.length ? list.map((st) => `<tr><td>${esc(st.group)} ${esc(st.seat)}號</td><td>${new Date(st.latest.at).toLocaleString('zh-TW')}</td><td>${esc(st.latest.state)}・${esc(st.latest.emotion)}</td><td><span class="urg u${st.urgency}">${{ 3: '高', 2: '中', 1: '低' }[st.urgency]}</span></td><td>${st.helpTotal}</td><td><button class="button button-secondary" data-action="teacher-student" data-value="${esc(st.id)}">查看</button></td></tr>`).join('') : '<tr><td colspan="6">沒有符合條件的學生。</td></tr>';
+    return `${tabs}${status}${help}${bar}<div style="overflow-x:auto"><table class="report-table"><thead><tr><th>學生</th><th>最近使用</th><th>最近情緒</th><th>緊急程度</th><th>找大人</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`;
+  },
+  state() {
+    return `<div class="choice-grid" role="group" aria-label="選擇火箭狀態">
+      ${Object.entries(states).map(([id, state]) => `
+        <button class="choice-card" type="button" data-action="state" data-value="${id}" data-state="${id}">
+          <span class="choice-emoji" aria-hidden="true">${state.icon}</span>
+          <span><strong>${state.label}</strong><small>${state.type}</small><small>${state.subtitle}</small></span>
+        </button>`).join('')}
+    </div>`;
+  },
+  emotion() {
+    const state = states[session.state];
+    return `<p class="selection-note" style="margin:0 0 14px">共 9 種情緒。選最接近的就好，也可以找大人一起看。</p><div class="emotion-list" role="group" aria-label="選擇感受">
+      ${state.emotions.map(([icon, label, text]) => `
+        <button class="emotion-choice" type="button" data-action="emotion" data-value="${label}">
+          <span class="emotion-icon" aria-hidden="true">${icon}</span><span><strong>${label}</strong><small>${text}</small></span>
+        </button>`).join('')}
+    </div>
+    <div class="button-row"><button class="button button-secondary" data-action="back">上一步</button><button class="button button-link" data-action="restart">重新開始</button></div>`;
+  },
+  rating() {
+    return `<div class="range-panel"><div class="range-top"><strong>現在這個感覺有多強？</strong><output class="range-value" id="rating-output">${session.rating}</output></div>
+      <input id="rating-range" type="range" min="1" max="5" step="1" value="${session.rating}" aria-label="當下感受強度，1 到 5">
+      <div class="range-labels"><span>一點點</span><span>非常強</span></div><p class="range-hint">沒有對錯，選一個最像現在的數字。需要時可以隨時找大人。</p></div>
+      <div class="button-row"><button class="button button-secondary" data-action="back">上一步</button><button class="button button-primary" data-action="continue-rating">繼續</button></div>`;
+  },
+  strengths: renderStrengths,
+  activityList: renderActivityList,
+  activityGuide() {
+    const item = activities.find((activity) => activity.id === session.selectedActivity);
+    const timed = Boolean(item.breathing || item.timedActivity);
+    const isWheel = item.interaction === 'wheel';
+    const stepNo = (i) => `<span class="step-no">${i + 1}</span>`;
+    const fullChecks = `<div class="check-area"><p class="interaction-instruction">做完請打勾 ✓</p><ol class="guide-steps">${item.steps.map((step, index) => `<li><label><input type="checkbox" data-action="check-step" data-value="${index}" ${session.checkedSteps.includes(index) ? 'checked' : ''}><span>${step}</span></label></li>`).join('')}</ol></div>`;
+    const numberedChecks = `<div class="check-area"><p class="interaction-instruction">做完請打勾 ✓</p><div class="done-row">${item.steps.map((step, index) => `<label class="done-check"><input type="checkbox" data-action="check-step" data-value="${index}" ${session.checkedSteps.includes(index) ? 'checked' : ''}>${stepNo(index)}<span>已完成</span></label>`).join('')}</div></div>`;
+    const instructions = `<ol class="do-list">${item.steps.map((step, index) => `<li>${stepNo(index)}<span>${step}</span></li>`).join('')}</ol>`;
+    let doing;
+    if (item.interaction === 'drawing') {
+      doing = `${instructions}<p class="interaction-instruction" id="draw-clock">${session.drawStart ? '' : '開始畫就會開始計時 1 分鐘，時間到才能按下一步'}</p><canvas id="doodle-canvas" width="600" height="240" aria-label="可用手指或滑鼠在畫板上塗鴉"></canvas><button class="button button-link" data-action="clear-drawing">揉掉／清除畫板</button>`;
+    } else if (isWheel) {
+      const running = !session.wheelStopped;
+      doing = `<p class="interaction-instruction">轉盤正在轉，按一下轉盤就會停下來；指針停在哪一句，就是這次抽到的話。</p><div class="roulette-panel"><span class="roulette-pointer" aria-hidden="true">▼</span><div class="roulette-wheel ${running ? 'running' : ''}" id="roulette-wheel" style="${running ? '' : `transform:rotate(${session.wheelAngle || 0}deg)`}"><span class="roulette-label label-a">A<br>還好沒有<br>更糟糕</span><span class="roulette-label label-b">B<br>下次知道<br>怎麼做</span><span class="roulette-label label-c">C<br>我已經<br>盡力了</span></div><p class="roulette-result">${session.selectedReframe ? `指針停在：${session.selectedReframe}` : '按一下轉盤停下來'}</p></div>`;
+    } else if (timed) {
+      doing = activityTimerMarkup(item);
+    } else {
+      doing = `${instructions}${item.waitSeconds ? `<p class="interaction-instruction" id="wait-clock">${session.waitDone ? '時間到，可以按下一步了' : `請先照著做，${item.waitSeconds} 秒後才能按下一步`}</p>` : ''}`;
+    }
+    const checks = isWheel ? '' : timed ? fullChecks : numberedChecks;
+    const back = session.teacherPreview ? '<button class="button button-secondary" data-action="teacher-tab" data-value="tools">返回工具箱</button>' : session.toolboxMode ? '<button class="button button-secondary" data-action="open-toolbox">返回工具箱</button>' : '<span></span>';
+    return `<h3 style="margin:0 0 6px;font-size:21px">${item.name}</h3><p class="guide-guidance">${item.summary}</p>
+      ${timed ? checks : ''}
+      <div class="guide-two"><div class="demo-area"><p class="area-title">示範動畫</p><img src="${assetSrc(item.image)}" alt="${item.alt}" width="260" height="160"></div><div class="do-area"><p class="area-title">跟做區域</p>${doing}</div></div>
+      ${timed ? '' : checks}
+      <div class="button-row">${back}<button class="button button-primary" data-action="activity-ready" ${guideComplete() ? '' : 'disabled'}>下一步</button></div>`;
+  },
+  activityCheck() {
+    const item = activities.find((activity) => activity.id === session.selectedActivity);
+    return `<div class="activity-check"><img src="${assetSrc(item.image)}" alt="" width="130" height="80"><h3>${item.name}</h3><p>請依照你的實際情況回報。這不是考試，選「還沒做完」也完全可以。</p>
+      <div class="button-row check-buttons"><button class="button button-secondary" data-action="report-not-done">我還沒做完</button><button class="button button-primary" data-action="report-done">我有跟著做</button></div>
+      <p class="verification-note">這是學生自我回報；不錄影，也不收集身體動作。</p></div>`;
+  },
+  review() {
+    return `<div class="range-panel"><div class="range-top"><strong>「${session.emotion}」這個感覺，現在有多強？</strong><output class="range-value" id="rating-output">${session.rating}</output></div>
+      <input id="rating-range" type="range" min="1" max="5" step="1" value="${session.rating}" aria-label="活動後當下感受強度，1 到 5">
+      <div class="range-labels"><span>一點點</span><span>非常強</span></div><p class="range-hint">數字變小、變大或一樣都可以。不需要為了完成而選某個數字。</p></div>
+      <div class="button-row end"><button class="button button-primary" data-action="submit-review">繼續</button></div>`;
+  },
+  increased() {
+    return `<div class="safety-banner"><strong>你回報「${session.emotion}」的感覺比剛才更強。</strong><br>不是你做錯了。先停一下，請告訴老師或信任的大人。</div>
+      <label class="adult-confirm"><input type="checkbox" data-action="adult-confirm"><span>我已告訴老師／信任的大人，並確認下一步</span></label>
+      <div class="button-row"><button class="button button-secondary" data-action="help">請老師來</button>${availableActivities().length ? '<button class="button button-primary" data-action="continue-with-adult" disabled>下一步，換一種方法</button>' : '<button class="button button-primary" data-action="finish-without-activity" disabled>下一步，先結束</button>'}</div>`;
+  },
+  adultGate() {
+    return `<div class="safety-banner"><strong>你選了 5 級，先找大人陪你。</strong><br>接下來會依序做第 1、2、3 級方法，再一起回來重測。任何時候不舒服都可以停止。</div>
+      <label class="adult-confirm"><input type="checkbox" data-action="adult-confirm"><span>老師／信任的大人已知道，並在我身邊陪同</span></label>
+      <div class="button-row"><button class="button button-secondary" data-action="help">請老師來</button><button class="button button-primary" data-action="adult-present" disabled>下一步：選第 1 級方法</button></div>`;
+  },
+  supportStop() {
+    const reason = session.stopReason === 'two-fives' ? '你已連續兩次選擇 5 級。' : '請先停止使用工具自己選方法。';
+    return `<div class="safety-banner"><strong>${reason}</strong><br>請現在找身邊的老師或信任的大人陪你。這不是處罰，也不代表你做錯了。</div>
+      <p class="feedback-note">你沒有做錯。接下來先由大人陪你決定，不再由工具推薦下一個方法。</p>
+      <div class="button-row"><button class="button button-secondary" data-action="help">請老師來</button><button class="button button-primary" data-action="close-after-support">知道了</button></div>`;
+  },
+  sessionStop() {
+    return `<div class="safety-banner"><strong>本次 5 分鐘使用時間已到。</strong><br>先停止操作，請找老師或信任的大人陪你。</div><div class="button-row end"><button class="button button-primary" data-action="logout">結束並登出</button></div>`;
+  },
+  done() {
+    const group = strengthGroupByEmotion[session.emotion];
+    const picked = group ? session.selectedStrengths.map((index) => strengths[group][index]?.[1]).filter(Boolean) : [];
+    const effective = session.attempts.filter((a) => a.status === 'done' && typeof a.post === 'number' && a.post < a.pre);
+    const report = session.attempts.length ? (effective.length ? `<p class="report-summary">點一點卡片，看看哪些方法幫到你：</p><div class="flip-row">${effective.map(flipCard).join('')}</div>` : '<p class="report-summary">這次還沒有讓感覺變小的方法，下次再試試別的。</p>') : '';
+    const comparison = '';
+    const again = !session.expired && session.stopReason !== 'two-fives' ? '<button class="button button-primary" data-action="restart">繼續體驗</button>' : '';
+    const teacher = session.needsTeacher ? '<div class="safety-banner"><strong>請現在走到老師身邊，告訴老師你需要陪伴。</strong></div>' : '';
+    return `${teacher}<div class="done-panel"><span class="done-mark" aria-hidden="true">✓</span><h3>這一趟完成了</h3><p>感覺不一定要馬上改變。謝謝你花時間照顧自己；想探索另一種情緒，可再開始一趟，沿用上方剩餘時間。</p>${comparison}${report}
+      ${picked.length ? `<div class="strength-summary" aria-label="本次收集的優勢貼紙">${picked.map((name) => `<span>${name}</span>`).join('')}</div>` : ''}
+      <div class="button-row end">${states[session.state]?.route === 'positive' ? '<button class="button button-secondary" data-action="stickers">查看我的貼紙</button>' : ''}${again}<button class="button button-secondary" data-action="logout">結束體驗</button></div></div>`;
+  },
+};
+
+function levelForRating(r) { return r <= 2 ? 1 : r <= 4 ? 2 : 3; }
+
+/* 同一級的方法都試過後，自動進下一級 */
+function nextActivityLevel(level) {
+  for (let l = level; l <= 3; l += 1) {
+    if (activities.some((a) => a.level === l && !session.triedActivities.includes(a.id))) return l;
+  }
+  return null;
+}
+
+function usageGate() {
+  const starts = session.profile.starts || [];
+  const dayStart = new Date();
+  dayStart.setHours(0, 0, 0, 0);
+  if (starts.filter((t) => t >= dayStart.getTime()).length >= DAILY_LIMIT) return `今天已經使用 ${DAILY_LIMIT} 次囉，明天再來吧！`;
+  const wait = MIN_GAP_MS - (Date.now() - Math.max(0, ...starts));
+  if (wait > 0) return `距離上次使用還不到 40 分鐘，請再等 ${Math.ceil(wait / 60000)} 分鐘。`;
+  return null;
+}
+
+async function tryBegin() {
+  const profile = session.profile;
+  if (!isTester()) await Promise.race([syncProfile(profile), new Promise((r) => setTimeout(r, 2500))]);
+  let gate = null;
+  if (!isTester()) {
+    const res = await api('startSession', { id: profile.id });
+    if (res && res.ok === false) gate = res.message || '現在不能使用，請稍後再試。';
+    else if (!res) gate = usageGate(); /* 連不上後端時，退回這台裝置的判斷 */
+  }
+  const profiles = readProfiles();
+  profiles[profile.id] = profile;
+  saveProfiles(profiles);
+  if (gate) { session.gateMessage = gate; render(); return; }
+  session.gateMessage = null;
+  profile.starts = [...(profile.starts || []), Date.now()];
+  profiles[profile.id] = profile;
+  saveProfiles(profiles);
+  syncProfile(profile);
+  storeRemove('sessionStorage', profileTimerKey(profile));
+  beginSession();
+}
+
+function startDrawClock() {
+  if (session.drawStart) return;
+  session.drawStart = Date.now();
+  const tick = () => {
+    const left = Math.max(0, 60 - Math.floor((Date.now() - session.drawStart) / 1000));
+    const el = app.querySelector('#draw-clock');
+    if (el) el.textContent = left > 0 ? `還剩 ${left} 秒` : '時間到，可以按下一步了';
+    if (left <= 0) {
+      window.clearInterval(session.drawTimerId);
+      session.drawTimerId = null;
+      session.interactionDone.drawing = true;
+      const ready = app.querySelector('[data-action="activity-ready"]');
+      if (ready) ready.disabled = !guideComplete();
+    }
+  };
+  session.drawTimerId = window.setInterval(tick, 1000);
+  tick();
+}
+
+function stopWheel() {
+  if (session.wheelStopped) return;
+  const el = app.querySelector('#roulette-wheel');
+  const m = new DOMMatrixReadOnly(getComputedStyle(el).transform);
+  let angle = Math.round(Math.atan2(m.b, m.a) * 180 / Math.PI);
+  if (angle < 0) angle += 360;
+  const at = (360 - angle) % 360;
+  const [key, text] = at >= 60 && at < 180 ? ['B', '這代表我下次知道怎麼做囉！'] : at >= 180 && at < 300 ? ['C', '沒關係，我已經盡力了！'] : ['A', '還好沒有更糟糕！'];
+  session.wheelAngle = angle;
+  session.wheelStopped = true;
+  session.selectedReframe = `${key}：「${text}」`;
+  session.interactionDone.wheel = true;
+  session.interactionDone.reframe = true;
+  render();
+}
+
+function startWaitClock() {
+  const item = activities.find((a) => a.id === session.selectedActivity);
+  if (!item || !item.waitSeconds || session.waitStart) return;
+  session.waitStart = Date.now();
+  const tick = () => {
+    const left = Math.max(0, item.waitSeconds - Math.floor((Date.now() - session.waitStart) / 1000));
+    const el = app.querySelector('#wait-clock');
+    if (el) el.textContent = left > 0 ? `請先照著做，還剩 ${left} 秒才能按下一步` : '時間到，可以按下一步了';
+    if (left <= 0) {
+      window.clearInterval(session.waitTimerId);
+      session.waitTimerId = null;
+      session.waitDone = true;
+      const ready = app.querySelector('[data-action="activity-ready"]');
+      if (ready) ready.disabled = !guideComplete();
+    }
+  };
+  session.waitTimerId = window.setInterval(tick, 1000);
+  tick();
+}
+
+function leavePreview() {
+  [session.activityTimerId, session.drawTimerId, session.waitTimerId].forEach((id) => { if (id) window.clearInterval(id); });
+  session.activityTimerId = null; session.drawTimerId = null; session.waitTimerId = null;
+  session.activityTimer = null;
+  session.teacherPreview = false;
+  session.toolboxMode = false;
+  session.selectedActivity = null;
+  teacherUI.view = 'tools';
+  setStage('teacherDashboard');
+}
+
+/* 排行榜：只計算前後測完整、且後測沒有高於前測的紀錄 */
+function rankFrom(attempts) {
+  const stats = {};
+  attempts.filter((a) => a.status === 'done' && typeof a.pre === 'number' && typeof a.post === 'number' && a.post <= a.pre).forEach((a) => {
+    const t = stats[a.name] || (stats[a.name] = { name: a.name, n: 0, sum: 0 });
+    t.n += 1;
+    t.sum += a.pre - a.post;
+  });
+  return Object.values(stats).map((t) => ({ ...t, avg: t.sum / t.n })).sort((a, b) => b.avg - a.avg || b.n - a.n).slice(0, 5);
+}
+
+function personalRanking() {
+  const profile = session.profile ? (readProfiles()[session.profile.id] || session.profile) : null;
+  const rows = ((profile && profile.records) || []).flatMap((r) => r.attempts || []);
+  if (!session.recordSaved) rows.push(...(session.attempts || []));
+  return rankFrom(rows);
+}
+
+function kahootList(list) {
+  const max = Math.max(0.1, ...list.map((t) => t.avg));
+  return `<ol class="kahoot-list">${list.map((t, i) => `<li class="kahoot-row k${i % 4}" style="animation-delay:${i * 0.4}s"><span class="k-rank">${i === 0 ? '👑' : i + 1}</span><span><strong>${esc(t.name)}</strong><span class="k-bar"><i style="--w:${Math.max(8, Math.round((t.avg / max) * 100))}%;animation-delay:${i * 0.4 + 0.4}s"></i></span></span><span class="k-score">降低 <b data-count="${t.avg.toFixed(2)}" data-delay="${i * 400}">0.0</b> 級<small>${t.n} 次</small></span></li>`).join('')}</ol>`;
+}
+
+function animateCounts() {
+  app.querySelectorAll('[data-count]').forEach((el) => {
+    const target = Number(el.dataset.count);
+    const t0 = performance.now() + Number(el.dataset.delay || 0);
+    const step = (t) => {
+      const p = Math.min(1, Math.max(0, (t - t0) / 900));
+      el.textContent = (target * p).toFixed(1);
+      if (p < 1) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  });
+}
+
+function flipCard(a) {
+  const act = activities.find((x) => x.name === a.name);
+  const icon = act ? (ASSET_ICONS[act.image] || '✦') : '✦';
+  return `<button class="flip-card" type="button" data-action="flip" aria-label="翻開卡片"><span class="flip-inner"><span class="flip-face flip-front">?<small>點我翻牌</small></span><span class="flip-face flip-back"><b>${icon}</b><strong>${esc(a.name)}</strong><small>感覺降低了 ${a.pre - a.post} 級</small></span></span></button>`;
+}
+
+function collectStudents() {
+  const map = new Map();
+  if (!apiEnabled()) Object.values(readProfiles()).forEach((p) => map.set(p.id, { group: p.group, seat: p.seat, records: [...(p.records || [])] }));
+  teacherData.records.forEach((p) => {
+    const entry = map.get(p.id) || { group: p.group, seat: p.seat, records: [] };
+    const seen = new Set(entry.records.map((r) => r.at));
+    (p.records || []).forEach((r) => { if (!seen.has(r.at)) entry.records.push(r); });
+    map.set(p.id, entry);
+  });
+  return [...map.entries()].map(([id, st]) => {
+    const records = st.records.sort((a, b) => a.at - b.at);
+    const latest = records[records.length - 1];
+    const negative = latest && NEGATIVE_ROCKETS.includes(latest.state);
+    const urgency = negative && latest.final >= 4 ? 3 : negative && latest.final === 3 ? 2 : 1;
+    return { id, group: st.group, seat: st.seat, records, latest, urgency, helpTotal: records.reduce((n, r) => n + (r.helpCount || 0), 0) };
+  }).filter((st) => st.records.length);
+}
+
+function filterStudents(list) {
+  const f = teacherUI.filter;
+  const day = new Date();
+  day.setHours(0, 0, 0, 0);
+  return list.filter((st) => (!f.group || st.group === f.group)
+    && (!f.urgency || String(st.urgency) === f.urgency)
+    && (!f.help || st.helpTotal >= Number(f.help))
+    && (!f.time || st.latest.at >= (f.time === 'today' ? day.getTime() : Date.now() - 7 * 86400000)))
+    .sort((a, b) => b.urgency - a.urgency || b.latest.at - a.latest.at);
+}
+
+async function exportExcel() {
+  const list = filterStudents(collectStudents());
+  const rows = [['班級', '座號', '時間', '火箭類型', '情緒', '調適方法與前後測', '求助次數']];
+  list.forEach((st) => st.records.forEach((r) => rows.push([st.group, st.seat, new Date(r.at).toLocaleString('zh-TW'), r.state, r.emotion, (r.attempts || []).map((a) => `${a.name}：${attemptText(a)}`).join('；'), r.helpCount || 0])));
+  try {
+    if (!window.XLSX) throw new Error('xlsx not loaded');
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), '使用紀錄');
+    XLSX.writeFile(wb, '情緒導航員紀錄.xlsx');
+    teacherUI.notice = '';
+  } catch {
+    const csv = '\ufeff' + rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+    a.download = '情緒導航員紀錄.csv';
+    a.click();
+    URL.revokeObjectURL(a.href);
+    teacherUI.notice = '無法產生 xlsx，已改存成 CSV（Excel 可直接開啟）。';
+  }
+  render();
+}
+
+function attemptText(a) {
+  return a.status === 'done' ? `${a.pre} 級 → ${a.post} 級` : a.status === 'nopost' || a.status === 'pending' ? '未填後測' : '尚未完成';
+}
+
+function commitRecord() {
+  if (!session.profile || !session.state || session.recordSaved) return;
+  session.recordSaved = true;
+  if (!session.toolboxMode && ['activityGuide', 'activityCheck'].includes(session.stage) && session.selectedActivity) {
+    const a = activities.find((x) => x.id === session.selectedActivity);
+    session.attempts.push({ name: a.name, level: a.level, pre: session.preActivityRating, post: null, status: 'unfinished' });
+  }
+  session.attempts.forEach((a) => { if (a.status === 'pending') a.status = 'nopost'; });
+  const profiles = readProfiles();
+  const profile = profiles[session.profile.id] || session.profile;
+  const record = { at: Date.now(), state: states[session.state].label, emotion: session.emotion, initial: session.initialRating, final: session.rating, attempts: session.attempts, helpCount: session.helpCount || 0 };
+  profile.records = [...(profile.records || []), record];
+  outboxWrite([...outboxRead(), { id: profile.id, record, badges: profile.badges || {} }]);
+  profiles[profile.id] = profile;
+  saveProfiles(profiles);
+  session.profile = profile;
+  flushOutbox().then(() => syncProfile(profile)).then((ok) => {
+    if (!ok) return;
+    const ps = readProfiles();
+    ps[profile.id] = profile;
+    saveProfiles(ps);
+  });
+}
+
+function logout() {
+  commitRecord();
+  stopSessionTimer();
+  if (session.activityTimerId !== null) window.clearInterval(session.activityTimerId);
+  session.activityTimerId = null;
+  session.profile = null;
+  session.expired = false;
+  session.toolboxMode = false;
+  setStage('profile');
+}
+
+function openToolbox() {
+  if (session.expired) return;
+  if (session.activityTimerId !== null) window.clearInterval(session.activityTimerId);
+  session.activityTimerId = null;
+  if (!session.toolboxMode) session.savedFlow = { stage: session.stage, selectedActivity: session.selectedActivity };
+  session.toolboxMode = true;
+  setStage('toolbox');
+}
+
+function closeToolbox() {
+  if (session.activityTimerId !== null) window.clearInterval(session.activityTimerId);
+  session.activityTimerId = null;
+  session.activityTimer = null;
+  session.toolboxMode = false;
+  const flow = session.savedFlow || { stage: 'state', selectedActivity: null };
+  session.selectedActivity = flow.selectedActivity;
+  setStage(flow.stage);
+}
+
+function finishSession() {
+  if (session.activityTimerId !== null) window.clearInterval(session.activityTimerId);
+  session.activityTimerId = null;
+  session.stage = 'done';
+  commitRecord();
+  render();
+  if (session.needsTeacher) simulateTeacherCall();
+}
+
+function restart() {
+  if (session.activityTimerId !== null) window.clearInterval(session.activityTimerId);
+  session.activityTimerId = null;
+  if (session.expired) { logout(); return; }
+  session.profile ? beginSession() : setStage('profile');
+}
+
+app.addEventListener('submit', (event) => {
+  if (event.target.id === 'profile-form') {
+    event.preventDefault();
+    setProfileFromForm();
+  } else if (event.target.id === 'teacher-login-form') {
+    event.preventDefault();
+    const data = new FormData(event.target);
+    teacherLogin(String(data.get('teacher-account')), String(data.get('teacher-password')));
+  }
+});
+
+app.addEventListener('click', (event) => {
+  if (!session.expired && !session.wheelStopped && session.stage === 'activityGuide' && event.target.closest('#roulette-wheel')) { stopWheel(); return; }
+  const button = event.target.closest('button[data-action]');
+  if (!button || button.disabled) return;
+  const { action, value } = button.dataset;
+  if (session.expired && !['logout', 'help'].includes(action)) return;
+  if (action === 'state') { session.state = value; setStage('emotion'); }
+  else if (action === 'emotion') { session.emotion = value; session.rating = 3; setStage('rating'); }
+  else if (action === 'begin-session') tryBegin();
+  else if (action === 'continue-rating') {
+    session.initialRating = session.rating;
+    session.preActivityRating = session.initialRating;
+    session.rating = session.initialRating;
+    session.activityLevelOverride = null;
+    session.recommendedActivityId = null;
+    session.retrySameLevel = false;
+    if (states[session.state].route === 'positive') setStage('strengths');
+    else if (recordNegativeRating(session.rating)) return;
+    else if (session.rating === 5) {
+      session.highIntensityCycle = true;
+      session.highLevelStep = 1;
+      session.escalated = true;
+      session.adultPresent = true;
+      setStage('activityList');
+    } else setStage('activityList');
+  } else if (action === 'finish-positive') {
+    earnSelectedStickers();
+    commitRecord();
+    setStage('done');
+  } else if (action === 'strength') {
+    const index = Number(value);
+    session.selectedStrengths = session.selectedStrengths.includes(index)
+      ? session.selectedStrengths.filter((item) => item !== index)
+      : session.selectedStrengths.length < 2 ? [...session.selectedStrengths, index] : session.selectedStrengths;
+    render();
+  } else if (action === 'choose-activity') {
+    if (session.stage === 'teacherDashboard') { session.teacherPreview = true; session.toolboxMode = true; }
+    if (session.activityTimerId !== null) window.clearInterval(session.activityTimerId);
+    session.activityTimerId = null;
+    session.selectedActivity = value;
+    session.activeMethodLevel = activities.find((item) => item.id === value).level;
+    session.checkedSteps = [];
+    session.interactionDone = {};
+    session.selectedReframe = null;
+    session.wheelRotation = 0;
+    session.wheelSpinning = false;
+    session.wheelStopped = false;
+    session.wheelAngle = 0;
+    if (session.waitTimerId) window.clearInterval(session.waitTimerId);
+    session.waitTimerId = null;
+    session.waitStart = null;
+    session.waitDone = false;
+    if (session.drawTimerId) window.clearInterval(session.drawTimerId);
+    session.drawTimerId = null;
+    session.drawStart = null;
+    if (!session.toolboxMode) session.preActivityRating = session.rating;
+    session.activityTimer = null;
+    const selected = activities.find((item) => item.id === value);
+    if (selected.breathing || selected.timedActivity) session.activityTimer = { phase: 'ready', cycle: 0, seconds: 0, phaseLabel: '' };
+    setStage('activityGuide');
+  } else if (action === 'activity-ready') { if (session.teacherPreview) leavePreview(); else setStage(session.toolboxMode ? 'toolbox' : 'activityCheck'); }
+  else if (action === 'start-activity-timer') startActivityTimer();
+  else if (action === 'stop-activity-timer') stopActivityTimer();
+  else if (action === 'spin-wheel') spinReframeWheel();
+  else if (action === 'clear-drawing') {
+    const canvas = app.querySelector('#doodle-canvas');
+    canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
+  } else if (action === 'report-done' || action === 'report-not-done') {
+    const done = action === 'report-done';
+    if (!done) {
+      session.checkedSteps = [];
+      session.interactionDone = {};
+      session.selectedReframe = null;
+      session.wheelStopped = false;
+      if (session.drawTimerId) window.clearInterval(session.drawTimerId);
+      session.drawTimerId = null;
+      session.drawStart = null;
+      const unfinished = activities.find((item) => item.id === session.selectedActivity);
+      session.activityTimer = unfinished?.breathing || unfinished?.timedActivity
+        ? { phase: 'ready', cycle: 0, seconds: 0, phaseLabel: '' }
+        : null;
+      setStage('activityGuide');
+      return;
+    }
+    if (!session.triedActivities.includes(session.selectedActivity)) session.triedActivities.push(session.selectedActivity);
+    session.completedActivities.push(session.selectedActivity);
+    session.activeMethodLevel = activities.find((item) => item.id === session.selectedActivity).level;
+    const doneMethod = activities.find((item) => item.id === session.selectedActivity);
+    session.attempts.push({ name: doneMethod.name, level: doneMethod.level, pre: session.preActivityRating, post: null, status: 'pending' });
+    session.lastActivityId = session.selectedActivity;
+    session.selectedActivity = null;
+    session.recommendedActivityId = null;
+    if (session.highIntensityCycle && session.highLevelStep < 3) {
+      /* 前測 5 級：第 1、2、3 級都做完才能後測 */
+      session.highLevelStep += 1;
+      setStage('activityList');
+    } else {
+      session.rating = session.preActivityRating;
+      setStage('review');
+    }
+  } else if (action === 'submit-review') {
+    const pending = session.attempts.filter((a) => a.status === 'pending');
+    const pre = pending.length ? pending[0].pre : session.preActivityRating;
+    const post = session.rating;
+    pending.forEach((a) => { a.post = post; a.status = 'done'; });
+    const lastLevel = activities.find((item) => item.id === session.lastActivityId).level;
+    if (recordNegativeRating(post)) return;
+    const bothLowest = pre === 1 && post === 1;
+    if (bothLowest || (post < pre && !(session.escalated && post >= 4))) { finishSession(); return; }
+    session.recommendedActivityId = null;
+    if (post === 5 && !session.escalated) {
+      session.highIntensityCycle = true;
+      session.escalated = true;
+      session.adultPresent = true;
+      session.highLevelStep = 1;
+    } else {
+      session.highIntensityCycle = false;
+      const next = nextActivityLevel(lastLevel);
+      if (!next) { session.needsTeacher = post >= 4; finishSession(); return; }
+      session.activityLevelOverride = next;
+    }
+    setStage('activityList');
+  } else if (action === 'adult-present') {
+    session.adultPresent = true;
+    session.highLevelStep = 1;
+    setStage('activityList');
+  } else if (action === 'continue-with-adult') {
+    if (session.highIntensityCycle) {
+      session.highLevelStep = 1;
+      session.highCycleStartRating = session.rating;
+    } else {
+      session.activityLevelOverride = session.activeMethodLevel;
+      session.retrySameLevel = true;
+      session.recommendedActivityId = null;
+    }
+    setStage(availableActivities().length ? 'activityList' : 'done');
+  } else if (action === 'close-after-support' || action === 'finish-without-activity') finishSession();
+  else if (action === 'activity-list') {
+    if (session.activityTimerId !== null) window.clearInterval(session.activityTimerId);
+    session.activityTimerId = null;
+    session.activityTimer = null;
+    session.selectedActivity = null;
+    setStage('activityList');
+  } else if (action === 'review-after-exhaustion') {
+    session.rating = session.preActivityRating ?? session.initialRating;
+    setStage('review');
+  } else if (action === 'reroll-method') {
+    recommendAnotherActivity();
+  } else if (action === 'back') setStage(session.stage === 'emotion' ? 'state' : session.stage === 'rating' ? 'emotion' : 'rating');
+  else if (action === 'flip') button.classList.toggle('flipped');
+  else if (action === 'teacher-tab') { if (session.teacherPreview) leavePreview(); teacherUI.view = value; setStage('teacherDashboard'); }
+  else if (action === 'teacher-student') { teacherUI.view = 'student'; teacherUI.studentId = value; setStage('teacherDashboard'); }
+  else if (action === 'teacher-export') exportExcel();
+  else if (action === 'logout') logout();
+  else if (action === 'open-toolbox') openToolbox();
+  else if (action === 'close-toolbox') closeToolbox();
+  else if (action === 'help') simulateTeacherCall();
+  else if (action === 'restart') restart();
+  else if (action === 'profile') {
+    stopSessionTimer(false);
+    session.profile = null;
+    setStage('profile');
+  } else if (action === 'teacher-login') setStage('teacherGate');
+  else if (action === 'back-to-profile') { unwatchTeacherData(); setStage('profile'); }
+  else if (action === 'stickers') setStage('stickerCollection');
+  else if (action === 'back-to-state') setStage('state');
+});
+
+app.addEventListener('change', (event) => {
+  if (event.target.matches('[data-filter]')) { teacherUI.filter[event.target.dataset.filter] = event.target.value; setStage('teacherDashboard'); return; }
+  if (event.target.matches('[data-action="check-step"]')) {
+    const index = Number(event.target.dataset.value);
+    session.checkedSteps = event.target.checked
+      ? [...new Set([...session.checkedSteps, index])]
+      : session.checkedSteps.filter((item) => item !== index);
+    const ready = app.querySelector('[data-action="activity-ready"]');
+    if (ready) ready.disabled = !guideComplete();
+    updateActivityTimerPanel();
+  }
+  if (event.target.matches('[data-action="adult-confirm"]')) {
+    session.adultPresent = event.target.checked;
+    const next = app.querySelector('[data-action="adult-present"], [data-action="continue-with-adult"], [data-action="finish-without-activity"]');
+    if (next) next.disabled = !event.target.checked;
+  }
+});
+
+app.addEventListener('input', (event) => {
+  if (event.target.id !== 'rating-range') return;
+  session.rating = Number(event.target.value);
+  document.querySelector('#rating-output').value = session.rating;
+  document.querySelector('#rating-output').textContent = session.rating;
+});
+
+document.querySelector('.help-button').addEventListener('click', () => { session.helpCount = (session.helpCount || 0) + 1; simulateTeacherCall(); });
+document.querySelector('#help-done').addEventListener('click', () => helpDialog.close());
+document.querySelector('#stickers-button').addEventListener('click', () => setStage('stickerCollection'));
+document.querySelector('#toolbox-button').addEventListener('click', openToolbox);
+document.querySelector('#teacher-logout').addEventListener('click', () => {
+  unwatchTeacherData();
+  if (session.teacherPreview) leavePreview();
+  session.profile = null;
+  session.expired = false;
+  setStage('profile');
+});
+document.querySelector('#profile-button').addEventListener('click', logout);
+window.addEventListener('resize', updateProfileButtonLabel);
+document.querySelector('.brand').addEventListener('click', (event) => { event.preventDefault(); restart(); });
+
+render();
+flushOutbox();
+    </script>
+  </body>
+</html>
