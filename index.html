@@ -1037,7 +1037,7 @@ function activityTimerMarkup(item) {
   return `<div class="activity-timer-panel" id="activity-timer-panel" aria-live="polite">
     <div class="activity-timer-copy"><strong>${message}</strong><span>${cycle}</span></div>
     <span class="activity-timer-value">${timer.phase === 'active' ? `${timer.seconds} 秒` : timer.phase === 'countdown' ? timer.seconds : '準備'}</span>${button}
-    <p>跟著畫面做就好；若頭暈或不舒服，請按「停止」並告訴大人。</p>
+    <p>跟著畫面做就好；若頭暈或不舒服，請停止動作。</p>
   </div>`;
 }
 
