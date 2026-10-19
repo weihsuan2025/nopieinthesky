@@ -474,10 +474,7 @@ h1 {
         <div id="app" class="screen" aria-live="polite"></div>
       </section>
 
-      <footer class="page-note">
-        <span class="note-star" aria-hidden="true">✳</span>
-        這裡沒有標準答案。你可以隨時停下來，找身邊信任的大人。
-      </footer>
+
     </main>
 
     <dialog id="help-dialog" class="help-dialog" aria-labelledby="help-title">
@@ -493,7 +490,7 @@ h1 {
     <script>
 const states = {
   angry: {
-    label: '噴火火箭', icon: '🔥', type: '高活力・負向', subtitle: '我很衝、心裡很不舒服！', route: 'negative',
+    label: '噴火火箭', icon: '🔥', subtitle: '我很衝、心裡很不舒服！', route: 'negative',
     emotions: [
       ['🌋', '暴怒', '我理智線斷掉了，整個人快要炸開！'], ['😡', '生氣', '我很不高興！好想大吼大叫或摔東西！'],
       ['😱', '驚恐', '突然被嚇到了，心臟狂跳、好恐慌！'], ['😨', '害怕', '好恐怖喔，我縮成一團不敢看！'],
@@ -503,7 +500,7 @@ const states = {
     ],
   },
   happy: {
-    label: '發光火箭', icon: '🌟', type: '高活力・正向', subtitle: '我精神超好、心裡甜甜的！', route: 'positive', strengthGroup: 'sprint',
+    label: '發光火箭', icon: '🌟', subtitle: '我精神超好、心裡甜甜的！', route: 'positive', strengthGroup: 'sprint',
     emotions: [
       ['🎁', '驚喜', '太不可思議了！竟然有這種好事情！'], ['🤩', '興奮', '好嗨好開心，我全身等不及要衝了！'],
       ['🎉', '狂喜', '太讚啦！高興到簡直要飛上天！'], ['🔍', '新奇', '這是什麼？好酷喔，我好想試試看！'],
@@ -513,7 +510,7 @@ const states = {
     ],
   },
   sad: {
-    label: '沒電火箭', icon: '🪫', type: '低活力・負向', subtitle: '我全身無力、心裡沉沉的…', route: 'negative',
+    label: '沒電火箭', icon: '🪫', subtitle: '我全身無力、心裡沉沉的…', route: 'negative',
     emotions: [
       ['😔', '自卑', '大家都好厲害，我好像什麼都做不好…'], ['😞', '失望', '本來很期待的，結果卻跟我原想的不一樣…'],
       ['🥱', '無聊', '沒事做，感覺發呆好沒意思…'], ['😢', '悲傷', '發生了很糟的事，眼淚一直掉不停…'],
@@ -523,7 +520,7 @@ const states = {
     ],
   },
   calm: {
-    label: '飄飄火箭', icon: '☁️', type: '低活力・正向', subtitle: '我像雲一樣，全身鬆鬆的～', route: 'positive', strengthGroup: 'cruise',
+    label: '飄飄火箭', icon: '☁️', subtitle: '我像雲一樣，全身鬆鬆的～', route: 'positive', strengthGroup: 'cruise',
     emotions: [
       ['🌾', '自在', '想做什麼就做什麼，完全沒有壓力！'], ['😊', '滿足', '覺得現在這樣剛剛好，很充實幸福！'],
       ['🥹', '感動', '聽到這句話，心裡暖暖的、眼眶紅紅的…'], ['🛡️', '安心', '身邊有人陪著我，什麼都不用擔心！'],
