@@ -444,6 +444,17 @@ h1 {
 .insight h4 { margin: 12px 0 6px; font-size: 14px; }
 .insight p { margin: 0 0 6px; font-size: 14px; line-height: 1.8; }
 p.insight-note { color: var(--muted); font-size: 12px; }
+.res-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+@media (max-width: 760px) { .res-grid { grid-template-columns: 1fr; } }
+.res-card { display: grid; align-content: start; gap: 8px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 8px; background: #fff; }
+.res-card p, .res-card h5 { margin: 0; }
+.res-rank { color: var(--green-dark); font-size: 12px; font-weight: 800; letter-spacing: .08em; }
+.res-head { display: grid; gap: 3px; font-size: 15px; line-height: 1.5; }
+.res-head a { color: var(--green-dark); font-weight: 800; overflow-wrap: anywhere; }
+.res-head .res-src { margin: 0; }
+.res-sum { font-size: 13px; line-height: 1.7; }
+.res-why { padding-top: 8px; border-top: 1px dashed var(--line); color: var(--muted); font-size: 13px; line-height: 1.7; }
+.res-why b { display: block; color: var(--ink); font-size: 12px; }
 .res-list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
 .res-list li { padding: 10px 12px; border: 1px solid var(--line); border-radius: 6px; background: #fff; font-size: 13px; line-height: 1.7; }
 .res-list a { color: var(--green-dark); font-weight: 800; }
@@ -625,9 +636,13 @@ function storeRemove(kind, key) {
 const DAILY_LIMIT = 2;
 const TEACHER_STAGES = ['teacherGate', 'teacherRegister', 'teacherAuthUnavailable', 'teacherDashboard'];
 const NEGATIVE_ROCKETS = ['噴火火箭', '沒電火箭'];
-const TESTER_ID = '6年0班-0';
-const isTester = () => Boolean(session.profile && session.profile.id === TESTER_ID);
-const teacherUI = { view: 'students', studentId: null, notice: '', filter: { group: '', urgency: '', help: '', time: '' } };
+const isTester = () => Boolean(session.profile && session.profile.group === '6年0班' && String(session.profile.seat) === '0');
+const teacherUI = { view: 'students', studentId: null, notice: '', filter: { school: '', group: '', urgency: '', help: '', time: '', rankSchool: '', rankGroup: '' } };
+const SCHOOL_RE = /^[\u4e00-\u9fa5A-Za-z0-9]{2,20}$/;
+const cleanSchool = (v) => String(v || '').replace(/\s+/g, '');
+const parseClasses = (text) => String(text || '').split(/[,，、;；]+/).map((c) => c.trim()).filter(Boolean)
+  .map((c) => { const m = c.match(/^([1-6])\s*年?\s*([\u4e00-\u9fa50-9]{1,4}?)\s*班?$/); return m ? `${m[1]}年${m[2]}班` : null; });
+const fullName = (p) => `${p.school ? p.school + ' ' : ''}${p.group} ${p.seat}號`;
 const MIN_GAP_MS = 40 * 60 * 1000;
 const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
@@ -664,7 +679,7 @@ async function syncProfile(profile) {
 /* 只有後端確定寄出通知信，才回傳 true（畫面才會顯示「已通知老師」） */
 async function sendHelp(entry) {
   const p = session.profile;
-  const res = await api('help', { id: p ? p.id : '', who: entry.who, emotion: entry.emotion, rating: entry.rating }, 12000);
+  const res = await api('help', { id: p ? p.id : '', who: entry.who, emotion: entry.emotion, rating: entry.rating, reason: entry.reason || '' }, 12000);
   return Boolean(res && res.ok && res.emailed);
 }
 
@@ -736,16 +751,37 @@ async function teacherLogin(account, password) {
   setStage('teacherDashboard');
 }
 
+async function updateTeacherProfile(form) {
+  const data = new FormData(form);
+  const err = document.querySelector('#teacher-profile-error');
+  const school = cleanSchool(data.get('school'));
+  const classes = parseClasses(data.get('classes'));
+  const email = String(data.get('email') || '').trim();
+  if (!SCHOOL_RE.test(school)) { err.textContent = '請輸入學校名稱（2 到 20 個中文字、英文或數字）。'; return; }
+  if (!classes.length || classes.includes(null)) { err.textContent = '任教班級格式不正確，例如：6年丙班。'; return; }
+  err.textContent = '儲存中…';
+  const res = await api('teacherUpdateProfile', { token: teacherUI.token, school, classes, email }, 15000);
+  if (!res) { err.textContent = '連不上伺服器，請稍後再試。'; return; }
+  if (res.error === 'unauthorized') { unwatchTeacherData(); setStage('teacherGate'); return; }
+  if (!res.ok) { err.textContent = res.message || '儲存失敗。'; return; }
+  teacherUI.me = res.me;
+  teacherData.sig = '';
+  await loadTeacherData();
+  teacherUI.notice = '資料已更新。';
+  render();
+}
+
 async function registerTeacher(form) {
   const data = new FormData(form);
   const err = document.querySelector('#teacher-register-error');
-  const classes = String(data.get('classes') || '').split(/[,，、;；]+/).map((c) => c.trim()).filter(Boolean)
-    .map((c) => { const m = c.match(/^([1-6])\s*年?\s*([\u4e00-\u9fa50-9]{1,4}?)\s*班?$/); return m ? `${m[1]}年${m[2]}班` : null; });
+  const classes = parseClasses(data.get('classes'));
+  const school = cleanSchool(data.get('school'));
+  if (!SCHOOL_RE.test(school)) { err.textContent = '請輸入學校名稱（2 到 20 個中文字、英文或數字）。'; return; }
   if (data.get('password') !== data.get('password2')) { err.textContent = '兩次輸入的密碼不一樣。'; return; }
   if (!classes.length || classes.includes(null)) { err.textContent = '任教班級格式不正確，例如：6年丙班。'; return; }
   if (!apiEnabled()) { err.textContent = '尚未設定後端網址（請編輯 config.js）。'; return; }
   err.textContent = '送出中…';
-  const res = await api('teacherRegister', { account: String(data.get('account')), password: String(data.get('password')), email: String(data.get('email')), classes }, 15000);
+  const res = await api('teacherRegister', { school, account: String(data.get('account')), password: String(data.get('password')), email: String(data.get('email')), classes }, 15000);
   if (!res) { err.textContent = '連不上伺服器，請確認網路與後端設定。'; return; }
   if (!res.ok) { err.textContent = res.message || '註冊失敗。'; return; }
   setStage('teacherGate');
@@ -764,13 +800,13 @@ const stepTitles = {
   teacherGate: ['教師管理入口', '教師登入後才能管理資料', 1],
   teacherAuthUnavailable: ['教師驗證尚未設定', '本機資料暫不開放清除', 1],
   start: ['準備開始', '準備好了就出發', 1],
-  stickerCollection: ['我的優勢貼紙', '看看目前收集了哪些力量', 4],
+  stickerCollection: ['', '我的優勢貼紙', 4, '看看目前收集了哪些力量'],
   state: ['第 1 步 · 找到現在的狀態', '你的火箭現在怎麼了？', 1],
   emotion: ['第 2 步 · 聽聽火箭訊號', '哪一種感覺最接近？', 2],
   rating: ['第 3 步 · 感受有多強？', '用自己的感覺選一個數字', 3],
   strengths: ['第 4 步 · 收集一個優勢', '這份好感覺裡有什麼力量？', 4],
-  activityList: ['', '跟著圖片一步一步做', 4, '不舒服可以隨時停下'],
-  activityGuide: ['', '跟著圖片一步一步做', 4, '不舒服可以隨時停下'],
+  activityList: ['', '跟著圖片一步一步做', 4],
+  activityGuide: ['', '跟著圖片一步一步做', 4],
   teacherRegister: ['教師註冊', '建立教師帳號', 1],
   activityCheck: ['活動回報 · 由你自己告訴我們', '你有跟著圖片做嗎？', 4],
   review: ['回頭看看 · 感受有變化嗎？', '再選一次現在的感受強度', 4],
@@ -803,10 +839,15 @@ function stopSelfGuidance(reason) {
   stopSessionTimer();
   session.stopReason = reason;
   if (reason === 'session-time') session.expired = true;
-  if (session.state && states[session.state].route === 'negative' && session.rating >= 4) session.needsTeacher = true;
+  const negative = Boolean(session.state && states[session.state].route === 'negative');
+  /* 自動寄信給老師的兩種情況：前後測都是 5 級；前測 5 級但時間到了還沒做完調適方式 */
+  const timeoutHigh = reason === 'session-time' && negative && session.initialRating === 5 && session.stage !== 'done';
+  if (negative && session.rating >= 4) session.needsTeacher = true;
+  if (timeoutHigh) session.needsTeacher = true;
   commitRecord();
   setStage(reason === 'session-time' ? 'sessionStop' : 'supportStop');
-  if (session.needsTeacher && reason !== 'session-time') simulateTeacherCall();
+  if (reason === 'two-fives') simulateTeacherCall('two-fives');
+  else if (timeoutHigh) simulateTeacherCall('timeout');
 }
 
 function updateHighIntensityClock() {
@@ -940,14 +981,20 @@ function setProfileFromForm() {
   const className = document.querySelector('#class-input').value.trim().replace(/班$/, '');
   const seat = document.querySelector('#seat-input').value.trim().replace(/號$/, '');
   const error = document.querySelector('#profile-error');
+  const school = cleanSchool(document.querySelector('#school-input').value);
+  if (!SCHOOL_RE.test(school)) {
+    error.textContent = '請輸入學校名稱（2 到 20 個中文字、英文或數字）。';
+    return;
+  }
   if (!/^[\u4e00-\u9fa5\d]{1,4}$/.test(className) || !/^\d{1,3}$/.test(seat)) {
     error.textContent = '請輸入班別（例如 丙 或 3）與 1 到 3 位數的座號。';
     return;
   }
   const group = `${grade}年${className}班`;
-  const id = `${group}-${seat}`;
+  const id = `${school}|${group}-${seat}`;
+  storeSet('localStorage', 'emotion-navigator-last-school', school);
   const profiles = readProfiles();
-  session.profile = profiles[id] || { id, group, seat, stickers: [] };
+  session.profile = profiles[id] || { id, group, seat, school, stickers: [] };
   profiles[id] = session.profile;
   saveProfiles(profiles);
   const loggedIn = session.profile;
@@ -960,7 +1007,7 @@ function setProfileFromForm() {
   setStage('start');
 }
 
-function simulateTeacherCall() {
+function simulateTeacherCall(reason) {
   const title = document.querySelector('#help-title');
   const eyebrow = document.querySelector('#help-eyebrow');
   const content = document.querySelector('#help-content');
@@ -971,8 +1018,8 @@ function simulateTeacherCall() {
   done.hidden = true;
   content.innerHTML = '<div class="call-progress"><span class="call-spinner" aria-hidden="true"></span><strong>正在通知老師…</strong><small>請先留在安全的位置。</small></div>';
   helpDialog.showModal();
-  const who = session.profile ? `${session.profile.group} ${session.profile.seat}號` : '未登入';
-  sendHelp({ who, at: Date.now(), emotion: session.emotion || '', rating: session.rating || 0 }).then((sent) => {
+  const who = session.profile ? fullName(session.profile) : '未登入';
+  sendHelp({ who, at: Date.now(), emotion: session.emotion || '', rating: session.rating || 0, reason: reason || '' }).then((sent) => {
     if (!helpDialog.open) return;
     title.textContent = sent ? '已通知老師' : '請現在找老師';
     content.innerHTML = sent
@@ -1013,9 +1060,8 @@ function render() {
   labelEl.textContent = label;
   labelEl.hidden = !label;
   const subEl = document.querySelector('#step-sub');
-  const noSub = session.stage === 'activityGuide' && ['shake-dance', 'finger-sense'].includes(session.selectedActivity);
-  subEl.textContent = noSub ? '' : sub;
-  subEl.hidden = noSub || !sub;
+  subEl.textContent = sub;
+  subEl.hidden = !sub;
   document.querySelector('#step-title').textContent = title;
   const stepCount = `${String(number).padStart(2, '0')} / 04`;
   document.querySelector('#step-count').textContent = TEACHER_STAGES.includes(session.stage) ? '' : stepCount;
@@ -1250,6 +1296,7 @@ function renderActivityList() {
 const screens = {
   profile() {
     return `<form class="profile-form" id="profile-form">
+      <label>學校<input id="school-input" name="school" autocomplete="off" maxlength="20" placeholder="例如：臺北國小" value="${esc(storeGet('localStorage', 'emotion-navigator-last-school') || '')}" required></label>
       <label>年級<select id="grade-input" name="grade" required>${[1,2,3,4,5,6].map((grade)=>`<option value="${grade}" ${grade===6?'selected':''}>${grade} 年級</option>`).join('')}</select></label>
       <label>班別<input id="class-input" name="class" autocomplete="off" maxlength="4" placeholder="例如：丙 或 3" required></label>
       <label>座號<input id="seat-input" name="seat" inputmode="numeric" autocomplete="off" maxlength="3" placeholder="例如：8" required></label>
@@ -1264,10 +1311,11 @@ const screens = {
   },
   teacherRegister() {
     return `<form class="profile-form" id="teacher-register-form">
+      <label>學校<input name="school" autocomplete="organization" maxlength="20" placeholder="例如：臺北國小" required></label>
       <label>帳號（英文字母、數字，3–20 字）<input name="account" autocomplete="username" maxlength="20" required></label>
       <label>密碼（至少 8 個字）<input name="password" type="password" autocomplete="new-password" minlength="8" required></label>
       <label>再輸入一次密碼<input name="password2" type="password" autocomplete="new-password" minlength="8" required></label>
-      <label>Email（學生按「找大人幫忙」時，通知信會寄到這裡）<input name="email" type="email" autocomplete="email" required></label>
+      <label>Email<input name="email" type="email" autocomplete="email" required></label>
       <label>任教班級（可填多個，用逗號分開）<input name="classes" placeholder="例如：6年丙班, 6年丁班" required></label>
       <p class="profile-error" id="teacher-register-error" role="alert"></p>
       <div class="button-row"><button class="button button-secondary" type="button" data-action="back-to-teacher-gate">返回</button><button class="button button-primary" type="submit">註冊</button></div>
@@ -1277,7 +1325,7 @@ const screens = {
     return `<div class="safety-banner"><strong>教師驗證尚未設定。</strong><br>此原型沒有校方帳號服務。為避免學生自行清除資料，個人資料清除功能維持鎖定；剛才輸入的帳密沒有儲存。</div><div class="button-row end"><button class="button button-primary" data-action="back-to-profile">返回個人資料</button></div>`;
   },
   start() {
-    return `<div class="done-panel start-panel"><span class="done-mark">🚀</span><h3>${session.profile.group} ${session.profile.seat}號，準備好了嗎？</h3>${session.gateMessage ? `<div class="safety-banner">${session.gateMessage}</div>` : ''}<div class="button-row end"><button class="button button-primary" data-action="begin-session">開始情緒導航</button></div></div>`;
+    return `<div class="done-panel start-panel"><span class="done-mark">🚀</span><h3>${esc(fullName(session.profile))}，準備好了嗎？</h3>${session.gateMessage ? `<div class="safety-banner">${session.gateMessage}</div>` : ''}<div class="button-row end"><button class="button button-primary" data-action="begin-session">開始情緒導航</button></div></div>`;
   },
   stickerCollection: renderStickerCollection,
   toolbox() {
@@ -1288,24 +1336,42 @@ const screens = {
   teacherDashboard() {
     const all = collectStudents();
     const tab = (view, label) => `<button class="tab ${teacherUI.view === view || (view === 'students' && teacherUI.view === 'student') ? 'active' : ''}" data-action="teacher-tab" data-value="${view}">${label}</button>`;
-    const tabs = `<div class="tab-row">${tab('students', '學生資料')}${tab('tools', '調適工具箱')}</div>`;
-    const status = `<p class="selection-note">${teacherUI.me ? `登入帳號：${esc(teacherUI.me.account)}（${teacherUI.me.admin ? '管理者，可看全部班級' : `任教班級：${esc((teacherUI.me.classes || []).join('、'))}`}）。` : ''}${teacherData.remote ? '已連線後端，顯示所有裝置的紀錄（每 20 秒自動更新）。' : (apiEnabled() ? '尚未取得後端資料。' : '尚未設定後端網址，目前只顯示這個瀏覽器的紀錄。')}${teacherUI.notice ? ` ${esc(teacherUI.notice)}` : ''}</p>`;
+    const tabs = `<div class="tab-row">${tab('students', '學生資料')}${tab('tools', '調適工具箱')}${tab('profile', '我的資料')}</div>`;
+    const status = `<p class="selection-note">${teacherUI.me ? `登入帳號：${esc(teacherUI.me.account)}（${teacherUI.me.admin ? '管理者，可看全部學校與班級' : `${esc(teacherUI.me.school || '尚未填學校')}　任教班級：${esc((teacherUI.me.classes || []).join('、'))}`}）。` : ''}${teacherData.remote ? '已連線後端，顯示所有裝置的紀錄（每 20 秒自動更新）。' : (apiEnabled() ? '尚未取得後端資料。' : '尚未設定後端網址，目前只顯示這個瀏覽器的紀錄。')}${teacherUI.notice ? ` ${esc(teacherUI.notice)}` : ''}</p>`;
+    if (teacherUI.view === 'profile') {
+      if (!teacherUI.me || teacherUI.me.admin) return `${tabs}<p class="selection-note">管理者帳號的資料請在後端設定，這裡只提供一般教師修改。</p>`;
+      const me = teacherUI.me;
+      return `${tabs}${status}<form class="profile-form" id="teacher-profile-form">
+        <label>任教學校<input name="school" maxlength="20" value="${esc(me.school || '')}" required></label>
+        <label>任教班級（可填多個，用逗號分開）<input name="classes" value="${esc((me.classes || []).join(', '))}" placeholder="例如：6年丙班, 6年丁班" required></label>
+        <label>Email<input name="email" type="email" value="${esc(me.email || '')}" required></label>
+        <p class="profile-error" id="teacher-profile-error" role="alert"></p>
+        <div class="button-row end"><button class="button button-primary" type="submit">儲存修改</button></div>
+      </form>`;
+    }
     if (teacherUI.view === 'tools') {
-      const rank = rankFrom(all.flatMap((st) => st.records.flatMap((r) => r.attempts || [])));
-      return `${tabs}<h3>全體學生有效方法排行榜</h3><p class="selection-note">已排除前後測不完整、後測高於前測的紀錄。</p>${rank.length ? kahootList(rank) : '<p class="selection-note">資料還不足。</p>'}<h3 style="margin-top:20px">全部調適方法（點進去看使用方式）</h3><div class="activity-grid">${activities.map((item) => `<article class="activity-card"><img src="${assetSrc(item.image)}" alt="${item.alt}" width="260" height="160"><div class="activity-card-copy"><div class="activity-card-meta"><span>第 ${item.level} 級</span><span>${item.duration}</span></div><h3>${item.name}</h3><p>${item.summary}</p><button class="button button-secondary activity-pick" data-action="choose-activity" data-value="${item.id}">查看使用方式</button></div></article>`).join('')}</div>`;
+      const f = teacherUI.filter;
+      const schoolOpts = [...new Set([...(teacherUI.me && teacherUI.me.school ? [teacherUI.me.school] : []), ...all.map((st) => st.school).filter(Boolean)])].sort();
+      const classOpts = [...new Set([...(teacherUI.me && !teacherUI.me.admin ? teacherUI.me.classes || [] : []), ...all.map((st) => st.group)])].sort();
+      const pick = (key, label, opts) => `<label>${label}<select data-filter="${key}"><option value="">全部</option>${opts.map((o) => `<option value="${esc(o)}" ${f[key] === o ? 'selected' : ''}>${esc(o)}</option>`).join('')}</select></label>`;
+      const scoped = all.filter((st) => (!f.rankSchool || st.school === f.rankSchool) && (!f.rankGroup || st.group === f.rankGroup));
+      const rank = rankFrom(scoped.flatMap((st) => st.records.flatMap((r) => r.attempts || [])));
+      const scopeText = `${f.rankSchool || '全部學校'}・${f.rankGroup || '全部班級'}`;
+      return `${tabs}<h3>有效方法排行榜</h3><div class="filter-bar">${pick('rankSchool', '學校', schoolOpts)}${pick('rankGroup', '班級', classOpts)}</div><p class="selection-note">目前範圍：${esc(scopeText)}。已排除前後測不完整、後測高於前測的紀錄。</p>${rank.length ? kahootList(rank) : '<p class="selection-note">資料還不足。</p>'}<h3 style="margin-top:20px">全部調適方法（點進去看使用方式）</h3><div class="activity-grid">${activities.map((item) => `<article class="activity-card"><img src="${assetSrc(item.image)}" alt="${item.alt}" width="260" height="160"><div class="activity-card-copy"><div class="activity-card-meta"><span>第 ${item.level} 級</span><span>${item.duration}</span></div><h3>${item.name}</h3><p>${item.summary}</p><button class="button button-secondary activity-pick" data-action="choose-activity" data-value="${item.id}">查看使用方式</button></div></article>`).join('')}</div>`;
     }
     if (teacherUI.view === 'student') {
       const st = all.find((x) => x.id === teacherUI.studentId);
       if (!st) return `${tabs}<p class="selection-note">找不到這位學生的紀錄。</p>`;
       const rows = [...st.records].sort((a, b) => b.at - a.at).map((r) => `<tr><td>${new Date(r.at).toLocaleString('zh-TW')}</td><td>${esc(r.state)}・${esc(r.emotion)}</td><td>${(r.attempts || []).length ? r.attempts.map((a) => `${esc(a.name)}：${esc(attemptText(a))}`).join('<br>') : '—'}</td></tr>`).join('');
-      return `${tabs}<div class="button-row" style="margin:0 0 10px"><button class="button button-secondary" data-action="teacher-tab" data-value="students">← 回學生列表</button></div><h3>${esc(st.group)} ${esc(st.seat)}號（共 ${st.records.length} 次）</h3><div style="overflow-x:auto"><table class="report-table"><thead><tr><th>時間</th><th>火箭・情緒</th><th>調適方法（前→後測）</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+      return `${tabs}<div class="button-row" style="margin:0 0 10px"><button class="button button-secondary" data-action="teacher-tab" data-value="students">← 回學生列表</button></div><h3>${esc(st.school ? st.school + ' ' : '')}${esc(st.group)} ${esc(st.seat)}號（共 ${st.records.length} 次）</h3><div style="overflow-x:auto"><table class="report-table"><thead><tr><th>時間</th><th>火箭・情緒</th><th>調適方法（前→後測）</th></tr></thead><tbody>${rows}</tbody></table></div>`;
     }
     const groups = [...new Set(all.map((st) => st.group))].sort();
+    const schools = [...new Set(all.map((st) => st.school).filter(Boolean))].sort();
     const sel = (key, label, opts) => `<label>${label}<select data-filter="${key}">${opts.map(([v, t]) => `<option value="${esc(v)}" ${teacherUI.filter[key] === v ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select></label>`;
-    const bar = `<div class="filter-bar">${sel('group', '班級', [['', '全部'], ...groups.map((g) => [g, g])])}${sel('urgency', '緊急程度', [['', '全部'], ['3', '高'], ['2', '中'], ['1', '低']])}${sel('help', '找大人次數', [['', '全部'], ['1', '1 次以上'], ['3', '3 次以上'], ['5', '5 次以上']])}${sel('time', '最近使用', [['', '全部'], ['today', '今天'], ['week', '近 7 天']])}<button class="button button-secondary" data-action="teacher-export">輸出 Excel</button></div>`;
+    const bar = `<div class="filter-bar">${schools.length > 1 ? sel('school', '學校', [['', '全部'], ...schools.map((g) => [g, g])]) : ''}${sel('group', '班級', [['', '全部'], ...groups.map((g) => [g, g])])}${sel('urgency', '緊急程度', [['', '全部'], ['3', '高'], ['2', '中'], ['1', '低']])}${sel('help', '找大人次數', [['', '全部'], ['1', '1 次以上'], ['3', '3 次以上'], ['5', '5 次以上']])}${sel('time', '最近使用', [['', '全部'], ['today', '今天'], ['week', '近 7 天']])}<button class="button button-secondary" data-action="teacher-export">輸出 Excel</button></div>`;
     const help = teacherData.help.length ? `<div class="help-alert"><strong>求助紀錄</strong><br>${teacherData.help.slice(0, 5).map((h) => `${new Date(h.at).toLocaleTimeString('zh-TW')} ${esc(h.who)}${h.emotion ? `（${esc(h.emotion)}）` : ''}`).join('<br>')}</div>` : '';
     const list = filterStudents(all);
-    const rows = list.length ? list.map((st) => `<tr><td>${esc(st.group)} ${esc(st.seat)}號</td><td>${new Date(st.latest.at).toLocaleString('zh-TW')}</td><td>${esc(st.latest.state)}・${esc(st.latest.emotion)}</td><td><span class="urg u${st.urgency}">${{ 3: '高', 2: '中', 1: '低' }[st.urgency]}</span></td><td>${st.helpTotal}</td><td><button class="button button-secondary" data-action="teacher-student" data-value="${esc(st.id)}">查看</button></td></tr>`).join('') : '<tr><td colspan="6">沒有符合條件的學生。</td></tr>';
+    const rows = list.length ? list.map((st) => `<tr><td>${esc(st.school ? st.school + ' ' : '')}${esc(st.group)} ${esc(st.seat)}號</td><td>${new Date(st.latest.at).toLocaleString('zh-TW')}</td><td>${esc(st.latest.state)}・${esc(st.latest.emotion)}</td><td><span class="urg u${st.urgency}">${{ 3: '高', 2: '中', 1: '低' }[st.urgency]}</span></td><td>${st.helpTotal}</td><td><button class="button button-secondary" data-action="teacher-student" data-value="${esc(st.id)}">查看</button></td></tr>`).join('') : '<tr><td colspan="6">沒有符合條件的學生。</td></tr>';
     return `${tabs}${status}${help}${bar}${insightHtml(all)}<div style="overflow-x:auto"><table class="report-table"><thead><tr><th>學生</th><th>最近使用</th><th>最近情緒</th><th>緊急程度</th><th>找大人</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`;
   },
   state() {
@@ -1560,9 +1626,9 @@ function flipCard(a) {
 
 function collectStudents() {
   const map = new Map();
-  if (!apiEnabled()) Object.values(readProfiles()).forEach((p) => map.set(p.id, { group: p.group, seat: p.seat, records: [...(p.records || [])] }));
+  if (!apiEnabled()) Object.values(readProfiles()).forEach((p) => map.set(p.id, { school: p.school || '', group: p.group, seat: p.seat, records: [...(p.records || [])] }));
   teacherData.records.forEach((p) => {
-    const entry = map.get(p.id) || { group: p.group, seat: p.seat, records: [] };
+    const entry = map.get(p.id) || { school: p.school || '', group: p.group, seat: p.seat, records: [] };
     const seen = new Set(entry.records.map((r) => r.at));
     (p.records || []).forEach((r) => { if (!seen.has(r.at)) entry.records.push(r); });
     map.set(p.id, entry);
@@ -1572,7 +1638,7 @@ function collectStudents() {
     const latest = records[records.length - 1];
     const negative = latest && NEGATIVE_ROCKETS.includes(latest.state);
     const urgency = negative && latest.final >= 4 ? 3 : negative && latest.final === 3 ? 2 : 1;
-    return { id, group: st.group, seat: st.seat, records, latest, urgency, helpTotal: records.reduce((n, r) => n + (r.helpCount || 0), 0) };
+    return { id, school: st.school || '', group: st.group, seat: st.seat, records, latest, urgency, helpTotal: records.reduce((n, r) => n + (r.helpCount || 0), 0) };
   }).filter((st) => st.records.length);
 }
 
@@ -1580,7 +1646,7 @@ function filterStudents(list) {
   const f = teacherUI.filter;
   const day = new Date();
   day.setHours(0, 0, 0, 0);
-  return list.filter((st) => (!f.group || st.group === f.group)
+  return list.filter((st) => (!f.school || st.school === f.school) && (!f.group || st.group === f.group)
     && (!f.urgency || String(st.urgency) === f.urgency)
     && (!f.help || st.helpTotal >= Number(f.help))
     && (!f.time || st.latest.at >= (f.time === 'today' ? day.getTime() : Date.now() - 7 * 86400000)))
@@ -1589,8 +1655,8 @@ function filterStudents(list) {
 
 async function exportExcel() {
   const list = filterStudents(collectStudents());
-  const rows = [['班級', '座號', '時間', '火箭類型', '情緒', '調適方法與前後測', '求助次數']];
-  list.forEach((st) => st.records.forEach((r) => rows.push([st.group, st.seat, new Date(r.at).toLocaleString('zh-TW'), r.state, r.emotion, (r.attempts || []).map((a) => `${a.name}：${attemptText(a)}`).join('；'), r.helpCount || 0])));
+  const rows = [['學校', '班級', '座號', '時間', '火箭類型', '情緒', '調適方法與前後測', '求助次數']];
+  list.forEach((st) => st.records.forEach((r) => rows.push([st.school, st.group, st.seat, new Date(r.at).toLocaleString('zh-TW'), r.state, r.emotion, (r.attempts || []).map((a) => `${a.name}：${attemptText(a)}`).join('；'), r.helpCount || 0])));
   try {
     if (!window.XLSX) throw new Error('xlsx not loaded');
     const wb = XLSX.utils.book_new();
@@ -1617,44 +1683,52 @@ const EMO_TAGS = {
   lonely: ['孤單'],
 };
 const TAG_LABEL = { anger: '生氣、煩躁', fear: '緊張、害怕', sad: '低落、疲累', selfworth: '自我價值', lonely: '孤單、人際' };
-const NANI = 'https://sel.nani.com.tw/%E5%8D%97%E4%B8%80%E8%AA%B2%E7%A8%8B';
 const FLIP = 'https://flipedu.parenting.com.tw/';
-/* 只收錄老師提供的網站中，我實際看得到標題與簡介的資源；連結點進去才是原網站內容 */
+const KNSH = 'https://sel.knsh.com.tw/';
+const knshPlan = (file) => `${KNSH}download/plans/01/${encodeURIComponent(file)}`;
+const SRC_NANI = (unit) => `南一 K-12 SEL・${unit} 教案`;
+/* 資源只收錄老師提供的網站中，確認得到標題與簡介的內容；每筆都是「點進去就是該教案／資源」的連結。
+   note＝活動資源摘述；fit＝為什麼適合這個情緒類型。康軒影片與閱讀資源網站沒有個別網址，只能連到該區。 */
 const RES = {
   anger: [
-    { title: '5-5-5 情緒煞車法：拆解訊息中的情緒', src: '翻轉教育', url: FLIP + 'article/010957', note: '文章主題：拆解訊息中的情緒、練習「5-5-5 情緒煞車法」。' },
-    { title: '放下「生氣氣球」，找回冷靜超能力', src: '南一 K-12 SEL・國小課程', url: NANI, note: '國語二下第三課的 SEL 教案，在頁面「國小課程」中查找。' },
-    { title: '行為反思學習單：「我想和你和好」', src: '翻轉教育', url: FLIP + 'teacher_resource/244', note: '以「行為反思」和「我想和你和好」處理學生人際問題（國小）。' },
-    { title: '情緒素養活動學習單：四大主題教情緒管理', src: '翻轉教育', url: FLIP + 'teacher_resource/168', note: '認識情緒、情緒變化、辨別情緒、情緒管理四步驟（國小、國中）。' },
+    { title: '放下「生氣氣球」，找回冷靜超能力', src: SRC_NANI('國語二下第三課'), url: 'https://reurl.cc/mpvd3G', note: '以「生氣氣球」為主題的國語課 SEL 教案，帶學生學習放下怒氣、找回冷靜。', fit: '教案主題直接對應生氣與冷靜。' },
+    { title: '5-5-5 情緒煞車法：拆解訊息中的情緒', src: '翻轉教育', url: FLIP + 'article/010957', note: '教學分享文章：拆解訊息中的情緒，練習「5-5-5 情緒煞車法」。', fit: '提供可立即教給學生的生氣煞車步驟。' },
+    { title: '我生氣了（影片，3 分 04 秒）', src: '康軒 SEL・影片資源（中高年級）', url: KNSH + '#section-videos', note: '學生為了打球錯過小組討論，同學因此得多做事；練習自我管理與人際技巧。到影片區找片名即可播放。', fit: '情境貼近學生的生氣經驗，適合看完後討論。' },
+    { title: '行為反思學習單：「我想和你和好」', src: '翻轉教育', url: FLIP + 'teacher_resource/244', note: '以「行為反思」和「我想和你和好」處理學生之間的人際問題（國小）。', fit: '衝突後可用來和好與反思。' },
   ],
   fear: [
-    { title: '穿越恐懼的迷霧／擁抱恐懼的重量', src: '南一 K-12 SEL・國小課程', url: NANI, note: '國語四下第六課、六下第六課的 SEL 教案，在「國小課程」中查找。' },
-    { title: '3 面向陪孩子學習壓力管理，維持學習動機', src: '翻轉教育', url: FLIP + 'article/009656', note: '教學分享文章，主題是壓力管理。' },
-    { title: '紓壓系列課程：今天你照顧自己了嗎？', src: '翻轉教育', url: FLIP + 'article/009767', note: '教學分享文章，主題是紓壓與自我照顧。' },
+    { title: '穿越恐懼的迷霧', src: SRC_NANI('國語四下第六課'), url: 'https://reurl.cc/xWED1N', note: '國語課 SEL 教案，主題是面對與穿越心中的恐懼。', fit: '教案主題直接對應害怕與緊張。' },
+    { title: '緊張的心情（影片，2 分 30 秒，閩南語發音）', src: '康軒 SEL・影片資源（中高年級）', url: KNSH + '#section-videos', note: '比賽前心跳加快、手心冒汗的緊張心情；練習自我覺察與自我管理。到影片區找片名即可播放。', fit: '用學生熟悉的比賽情境說明緊張的身體反應。' },
+    { title: 'SEL 靜心呼吸動畫', src: '康軒 SEL・班級經營資源', url: 'https://vimeo.com/1173228689', note: '約 1 分鐘的呼吸節奏動畫，可在上課前或轉換活動時播放。', fit: '短、可直接播放，適合緊張時帶全班一起緩下來。' },
+    { title: '召喚內心的「勇敢超人」', src: SRC_NANI('國語二下第二課'), url: 'https://reurl.cc/X2lXjM', note: '國語課 SEL 教案，主題是找出內心的勇敢力量。', fit: '幫學生建立面對害怕的信心。' },
+    { title: '擁抱恐懼的重量', src: SRC_NANI('國語六下第六課'), url: 'https://reurl.cc/qp1Dk0', note: '國語課 SEL 教案，主題是接納並承擔恐懼。', fit: '適合高年級談較深的恐懼與壓力。' },
   ],
   sad: [
-    { title: 'RULER 情緒管理 5 大法則：讓孩子從小學會掌握情緒', src: '翻轉教育', url: FLIP + 'article/003266', note: '教學分享文章，主題是情緒管理。' },
-    { title: '情緒小偵探（繪本式 SEL 互動遊戲）', src: '南一 K-12 SEL', url: 'http://video.nani.com.tw/eso115sel', note: '從情境出發探索情緒、練習同理與回應（頁面標示對應社會三上）。' },
-    { title: '翻轉黑點的新視界', src: '南一 K-12 SEL・國小課程', url: NANI, note: '國語三上第四課的 SEL 教案，在「國小課程」中查找。' },
+    { title: '翻轉黑點的新視界', src: SRC_NANI('國語三上第四課'), url: 'https://reurl.cc/532gpR', note: '國語課 SEL 教案，主題是換個角度看待讓人難過的「黑點」。', fit: '教案主題對應低落與失望時的轉念。' },
+    { title: '在挫折中成長（影片，1 分 07 秒）', src: '康軒 SEL・影片資源（中高年級）', url: KNSH + '#section-videos', note: '動畫角色在棋賽輸了之後仍繼續努力；練習自我覺察與自我管理。到影片區找片名即可播放。', fit: '短片適合在失望、沮喪時討論如何重新出發。' },
+    { title: '咪美好難過，怎麼辦？（閱讀）', src: '康軒 SEL・閱讀資源', url: KNSH + '#section-materials', note: '小貓面對奶奶過世的難過，學會向人求助（康軒學習雜誌初階版第 428 期）。在閱讀資源區找篇名。', fit: '用故事陪學生認識難過、練習求助。' },
+    { title: 'RULER 情緒管理 5 大法則：讓孩子從小學會掌握情緒', src: '翻轉教育', url: FLIP + 'article/003266', note: '教學分享文章，主題是情緒管理。', fit: '提供帶學生處理低落情緒的方法架構。' },
   ],
   selfworth: [
-    { title: 'SEL 班級經營活動：優點大明星', src: '翻轉教育', url: FLIP + 'teacher_resource/507', note: '附活動步驟說明、Canva 範本編輯檔與紙本列印檔（國小）。' },
-    { title: '擁抱自己的與眾不同', src: '南一 K-12 SEL・國小課程', url: NANI, note: '國語四下第五課的 SEL 教案，在「國小課程」中查找。' },
+    { title: '擁抱自己的與眾不同', src: SRC_NANI('國語四下第五課'), url: 'https://reurl.cc/M2k7Nn', note: '國語課 SEL 教案，主題是接納自己與別人的不同。', fit: '教案主題直接對應自卑與自我價值。' },
+    { title: 'SEL 班級經營活動：優點大明星', src: '翻轉教育', url: FLIP + 'teacher_resource/507', note: '附活動步驟說明、Canva 範本編輯檔與紙本列印檔（國小）。', fit: '讓學生看見自己與同學的優點。' },
+    { title: '人比人氣死人（閱讀）', src: '康軒 SEL・閱讀資源', url: KNSH + '#section-materials', note: '班上來了雙胞胎轉學生，大家的反應引出嫉妒與自信的討論（康軒學習雜誌進階版 377 期）。在閱讀資源區找篇名。', fit: '從比較心態切入，談自信。' },
   ],
   lonely: [
-    { title: 'SEL 班級經營活動：好事貼文', src: '翻轉教育', url: FLIP + 'teacher_resource/516', note: '附活動步驟說明、Canva 範本編輯檔與紙本列印檔（國小）。' },
-    { title: '打造有歸屬感的溫馨教室：一堂好玩的聊天課', src: '翻轉教育', url: FLIP + 'teacher_resource/17', note: '用聊天技巧與萬用金句打通學生之間的隔閡（國小）。' },
-    { title: '怎麼交到真正的朋友？「大石頭」三步驟', src: '翻轉教育', url: FLIP + 'article/009761', note: '教學分享文章，主題是學習維繫友情。' },
+    { title: '秋千的心願（影片，2 分 39 秒）', src: '康軒 SEL・影片資源（中低年級）', url: KNSH + '#section-videos', note: '秋千希望小朋友不要為了搶玩而爭吵；練習自我覺察與人際技巧。到影片區找片名即可播放。', fit: '從分享與輪流切入，促進同學互動。' },
+    { title: 'SEL 班級經營活動：好事貼文', src: '翻轉教育', url: FLIP + 'teacher_resource/516', note: '附活動步驟說明、Canva 範本編輯檔與紙本列印檔（國小）。', fit: '讓同學互相看見彼此的好。' },
+    { title: 'SEL 陪伴卡', src: '康軒 SEL・班級經營資源', url: KNSH + 'companion/index.html', note: '50 張依 SEL 五大能力設計的正向陪伴卡，可線上翻閱。', fit: '用溫暖的話語陪伴感到孤單的學生。' },
+    { title: '越過心靈的圍牆', src: SRC_NANI('國語六下第七課'), url: 'https://reurl.cc/xWEDlN', note: '國語課 SEL 教案，主題是跨過心中的圍牆與他人連結。', fit: '適合高年級談人際隔閡。' },
+    { title: '超能力覺醒——最強隊友養成術（高年級）', src: '康軒 SEL・國小主題教案（邱怡雯）', url: knshPlan('04.彈性學習課程 SEL主題教案(高年級_邱怡雯).pdf'), note: '彈性學習課程的 SEL 主題教案（PDF），以團隊合作為主軸。', fit: '練習和同學合作、成為好隊友。' },
   ],
   general: [
-    { title: '情緒觀測站！認識正向與負向情緒', src: '翻轉教育', url: FLIP + 'teacher_resource/75', note: '認識情緒詞彙、練習辨識自己與他人的情緒（國小）。' },
-    { title: '孩子只會說「好煩」？用情緒儀表板練習「情緒命名」', src: '翻轉教育', url: FLIP + 'article/010534', note: '教學分享文章，主題是情緒命名。' },
-    { title: '翰林 SEL：課堂暖身引導', src: '翰林 SEL 幸福共好計畫', url: 'https://sel.hle.com.tw/', note: '每堂課前 5 分鐘的情緒覺察引導，附提問腳本與範例。' },
-    { title: '情緒卡（動態情緒圖卡）', src: '南一 K-12 SEL', url: 'https://s3-ap-northeast-1.amazonaws.com/nani.media/108ch-card/index.html', note: '翻面有情緒的文字解釋和例句（對應國語全冊）。' },
+    { title: '情緒四象限翻翻卡', src: '康軒 SEL・班級經營資源', url: KNSH + 'emotion/index.html', note: '36 張情緒詞彙卡，分成黃、紅、藍、綠四個象限，幫學生說出自己的感受。', fit: '和本工具的四種火箭分類相近，可延伸全班的情緒命名練習。' },
+    { title: '情緒探險隊——從心出發的旅程（中年級）', src: '康軒 SEL・國小主題教案（賴玉敏）', url: knshPlan('03.彈性學習課程 SEL主題教案(中年級_賴玉敏).pdf'), note: '彈性學習課程的 SEL 主題教案（PDF），帶學生探索並認識自己的情緒。', fit: '完整的情緒覺察單元，可做為班級後續課程。' },
+    { title: '音樂引導的專注練習：用音樂與呼吸調整身心的 5 分鐘練習', src: '康軒 SEL・國小主題教案（方美霞）', url: knshPlan('07.國小藝術領域SEL融入教案-共通.pdf'), note: '藝術領域的 SEL 教案（PDF），用音樂與呼吸做 5 分鐘身心調整。', fit: '5 分鐘就能做，適合課前或轉換時使用。' },
+    { title: '情緒觀測站！認識正向與負向情緒', src: '翻轉教育', url: FLIP + 'teacher_resource/75', note: '認識情緒詞彙、練習辨識自己與他人的情緒（國小）。', fit: '全班一起練習認識與命名情緒。' },
+    { title: '我們的靜心角海報', src: '康軒 SEL・班級經營資源', url: KNSH + 'download/sel_tool/' + encodeURIComponent('06-115(一)SEL海報三_我們的靜心角.pdf'), note: '列出日常調節情緒的方法，並附便利貼區讓學生分享心情。', fit: '可布置成教室靜心角，與本工具的調適方法互相呼應。' },
   ],
-  ai: { title: 'SEL AI 機器人', src: '南一 K-12 SEL', url: 'https://sel.nani.com.tw/sel-ai%E6%A9%9F%E5%99%A8%E4%BA%BA', note: '提供活動點子與情緒對話，也能做文本提問、SEL 教案撰寫與情緒插圖，適合備課。' },
 };
-
 function analyzeClass(list) {
   const f = teacherUI.filter;
   const day = new Date();
@@ -1681,7 +1755,6 @@ function analyzeClass(list) {
     best: rankFrom(recs.flatMap(({ r }) => r.attempts || []))[0] || null,
   };
 }
-
 function insightHtml(all) {
   const f = teacherUI.filter;
   const a = analyzeClass(filterStudents(all));
@@ -1698,18 +1771,19 @@ function insightHtml(all) {
   if (a.help) lines.push(`學生共按了 ${a.help} 次「找大人幫忙」。`);
   if (a.best) lines.push(`目前最有幫助的調適方法是「${esc(a.best.name)}」（平均降低 ${a.best.avg.toFixed(1)} 級，${a.best.n} 次）。`);
   if (a.despair) lines.push('出現「絕望」類情緒時，請依校內輔導流程進一步了解與轉介；本工具只是自我調節的輔助，不能取代專業評估。');
-  const tags = Object.entries(a.tagCounts).sort((x, y) => y[1] - x[1]).slice(0, 2);
+  /* 只推薦前三名：依班上出現最多的情緒類型輪流各取一份，不足再用通用資源補滿 */
+  const tags = Object.entries(a.tagCounts).sort((x, y) => y[1] - x[1]).slice(0, 3);
   const picks = [];
-  const add = (r, why) => { if (!picks.some((p) => p.r.title === r.title)) picks.push({ r, why }); };
-  tags.forEach(([tag, n]) => RES[tag].slice(0, 2).forEach((r) => add(r, `班上「${TAG_LABEL[tag]}」類情緒出現 ${n} 次`)));
-  if (!a.neg) { add(RES.lonely[0], '維持班級正向氛圍'); add(RES.selfworth[0], '肯定學生的優點'); }
-  add(RES.general[0], '全班一起練習認識與命名情緒');
-  add(RES.general[2], '每堂課前 5 分鐘的情緒覺察暖身');
-  add(RES.ai, '用 AI 工具快速備課');
+  const add = (r, why) => { if (picks.length < 3 && !picks.some((p) => p.r.title === r.title)) picks.push({ r, why: `${why}${r.fit}` }); };
+  for (let round = 0; round < 3 && picks.length < 3; round += 1) {
+    tags.forEach(([tag, n]) => { if (RES[tag][round]) add(RES[tag][round], `班上「${TAG_LABEL[tag]}」類情緒出現 ${n} 次。`); });
+  }
+  if (!a.neg) { add(RES.lonely[1], '這段期間以正向情緒為主，可維持班級氛圍。'); add(RES.selfworth[1], '肯定學生的優點。'); }
+  RES.general.forEach((r) => add(r, picks.length ? '做為班級的通用情緒教育資源。' : ''));
   const small = a.sessions < 5 ? '<p class="insight-note">資料量還少（少於 5 次使用），分析僅供參考。</p>' : '';
   return `<div class="insight"><h3>班級狀況說明</h3>${lines.map((l) => `<p>${l}</p>`).join('')}${small}
-    <h4>建議活動與資源</h4><ul class="res-list">${picks.slice(0, 7).map(({ r, why }) => `<li><a href="${esc(r.url)}" target="_blank" rel="noopener noreferrer">${esc(r.title)}</a><span class="res-src">${esc(r.src)}</span><small>${esc(r.note)}（推薦原因：${esc(why)}）</small></li>`).join('')}</ul>
-    <p class="insight-note">以上說明由「出現次數、強度、使用後變化」等規則整理而成，不是診斷；資源來自老師提供的網站，內容請老師自行評估是否適合班級。康軒數位高手、LearnMode 需登入才看得到內容，未列入推薦，可自行查閱。</p></div>`;
+    <h4>建議活動與資源（前三名）</h4><div class="res-grid">${picks.map(({ r, why }, i) => `<article class="res-card"><p class="res-rank">推薦 ${i + 1}</p><h5 class="res-head"><a href="${esc(r.url)}" target="_blank" rel="noopener noreferrer">${esc(r.title)}</a><span class="res-src">${esc(r.src)}</span></h5><p class="res-sum">${esc(r.note)}</p><p class="res-why"><b>推薦原因</b>${esc(why)}</p></article>`).join('')}</div>
+    <p class="insight-note">以上說明由「出現次數、強度、使用後變化」等規則整理而成，不是診斷；資源來自老師提供的網站，內容請老師自行評估是否適合班級。康軒數位高手、LearnMode 需登入才看得到內容，未列入推薦，可自行查閱。連到康軒影片區或閱讀資源區的項目，請在該區依片名或篇名尋找。</p></div>`;
 }
 
 function attemptText(a) {
@@ -1776,7 +1850,6 @@ function finishSession() {
   session.stage = 'done';
   commitRecord();
   render();
-  if (session.needsTeacher) simulateTeacherCall();
 }
 
 function restart() {
@@ -1790,6 +1863,9 @@ app.addEventListener('submit', (event) => {
   if (event.target.id === 'profile-form') {
     event.preventDefault();
     setProfileFromForm();
+  } else if (event.target.id === 'teacher-profile-form') {
+    event.preventDefault();
+    updateTeacherProfile(event.target);
   } else if (event.target.id === 'teacher-register-form') {
     event.preventDefault();
     registerTeacher(event.target);
@@ -1958,7 +2034,6 @@ app.addEventListener('click', (event) => {
   else if (action === 'logout') logout();
   else if (action === 'open-toolbox') openToolbox();
   else if (action === 'close-toolbox') closeToolbox();
-  else if (action === 'help') simulateTeacherCall();
   else if (action === 'restart') restart();
   else if (action === 'profile') {
     stopSessionTimer(false);
